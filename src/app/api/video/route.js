@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+const VEO_API_BASE = 'https://veo3api.com';
 
 // Enhance the user prompt for cinematic video generation
 async function enhanceVideoPrompt(userPrompt) {
@@ -45,37 +45,37 @@ Example output: A thrilling high-speed car race through a neon-lit cityscape at 
 export async function POST(req) {
   try {
     const { prompt, model } = await req.json();
-    const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
+    const apiKey = process.env.VEO3_API_KEY;
 
     if (!prompt) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
     }
 
     if (!apiKey || apiKey.includes('your_')) {
-      return NextResponse.json({ error: 'Google Gemini API key not configured' }, { status: 500 });
+      return NextResponse.json({ error: 'VEO3 API key not configured' }, { status: 500 });
     }
 
     // Enhance prompt
     const enhancedPrompt = await enhanceVideoPrompt(prompt);
     console.log('Video enhanced prompt:', enhancedPrompt);
 
-    const veoModel = model || 'veo-3.1-generate-preview';
+    // Use model from agent config: "veo3" (high quality) or "veo3-fast" (fast)
+    const veoModel = model || 'veo3-fast';
 
-    // Step 1: Start video generation (async operation)
-    const generateRes = await fetch(
-      `${GEMINI_API_BASE}/models/${veoModel}:predictLongRunning?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          instances: [{ prompt: enhancedPrompt }],
-          parameters: {
-            aspectRatio: '16:9',
-            personGeneration: 'allow_all',
-          },
-        }),
-      }
-    );
+    // Step 1: Start video generation
+    const generateRes = await fetch(`${VEO_API_BASE}/generate`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt: enhancedPrompt,
+        model: veoModel,
+        aspect_ratio: '16:9',
+        watermark: null,
+      }),
+    });
 
     if (!generateRes.ok) {
       const errText = await generateRes.text();
@@ -83,81 +83,67 @@ export async function POST(req) {
       return NextResponse.json({ error: `Video generation failed: ${generateRes.status}` }, { status: 500 });
     }
 
-    const operation = await generateRes.json();
-    const operationName = operation.name;
+    const generateData = await generateRes.json();
 
-    if (!operationName) {
-      return NextResponse.json({ error: 'No operation returned from Veo' }, { status: 500 });
+    if (generateData.code !== 200 || !generateData.data?.task_id) {
+      return NextResponse.json({ error: generateData.message || 'No task ID returned' }, { status: 500 });
     }
 
+    const taskId = generateData.data.task_id;
+    console.log('Video task started:', taskId);
+
     // Step 2: Poll for completion (max ~5 minutes)
-    let result = null;
+    let videoUrl = null;
     const maxAttempts = 60; // 60 * 5s = 5 minutes
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise(r => setTimeout(r, 5000));
 
-      const pollRes = await fetch(
-        `${GEMINI_API_BASE}/operations/${operationName}?key=${apiKey}`
-      );
+      const pollRes = await fetch(`${VEO_API_BASE}/feed?task_id=${taskId}`, {
+        headers: { 'Authorization': `Bearer ${apiKey}` },
+      });
 
       if (!pollRes.ok) {
-        const errText = await pollRes.text();
-        console.error('Poll error:', pollRes.status, errText);
+        console.error('Poll error:', pollRes.status);
         continue;
       }
 
       const pollData = await pollRes.json();
 
-      if (pollData.done) {
-        result = pollData;
+      if (pollData.data?.status === 'COMPLETED') {
+        const urls = pollData.data?.response;
+        if (urls && urls.length > 0) {
+          videoUrl = urls[0];
+        }
         break;
       }
 
-      console.log(`Video generation polling... attempt ${i + 1}/${maxAttempts}`);
+      if (pollData.data?.status === 'FAILED') {
+        return NextResponse.json({ error: 'Video generation failed' }, { status: 500 });
+      }
+
+      console.log(`Video polling... attempt ${i + 1}/${maxAttempts}, status: ${pollData.data?.status}`);
     }
 
-    if (!result) {
+    if (!videoUrl) {
       return NextResponse.json({ error: 'Video generation timed out' }, { status: 504 });
     }
 
-    if (result.error) {
-      return NextResponse.json({ error: result.error.message || 'Video generation failed' }, { status: 500 });
-    }
-
-    // Step 3: Get video URL from result
-    const generatedVideos = result.response?.generateVideoResponse?.generatedSamples
-      || result.response?.generatedVideos
-      || result.metadata?.generatedVideos;
-
-    if (!generatedVideos || generatedVideos.length === 0) {
-      // Try alternative response formats
-      const video = result.response?.predictions?.[0];
-      if (video?.video?.uri) {
-        return NextResponse.json({ url: video.video.uri });
+    // Step 3: Try to get 1080p version (free)
+    try {
+      const hdRes = await fetch(`${VEO_API_BASE}/get-1080p?task_id=${taskId}`, {
+        headers: { 'Authorization': `Bearer ${apiKey}` },
+      });
+      if (hdRes.ok) {
+        const hdData = await hdRes.json();
+        if (hdData.data?.result_url) {
+          videoUrl = hdData.data.result_url;
+        }
       }
-      console.error('No video in response:', JSON.stringify(result).slice(0, 500));
-      return NextResponse.json({ error: 'No video generated' }, { status: 500 });
+    } catch {
+      // 1080p upgrade failed, use original URL
     }
 
-    const videoUri = generatedVideos[0]?.video?.uri || generatedVideos[0]?.uri;
-
-    if (!videoUri) {
-      console.error('No video URI found:', JSON.stringify(generatedVideos[0]).slice(0, 300));
-      return NextResponse.json({ error: 'No video URL in response' }, { status: 500 });
-    }
-
-    // Download the video and convert to base64 data URI
-    const videoDownload = await fetch(`${videoUri}?key=${apiKey}`);
-    if (!videoDownload.ok) {
-      // If direct download fails, return the URI as-is (user can try direct)
-      return NextResponse.json({ url: videoUri });
-    }
-
-    const videoBuffer = await videoDownload.arrayBuffer();
-    const base64 = Buffer.from(videoBuffer).toString('base64');
-    const dataUrl = `data:video/mp4;base64,${base64}`;
-
-    return NextResponse.json({ url: dataUrl });
+    return NextResponse.json({ url: videoUrl });
 
   } catch (error) {
     console.error('Video generation error:', error);

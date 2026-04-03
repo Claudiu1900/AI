@@ -1370,7 +1370,7 @@ function AgentsTab({ supabase }) {
                   <option value="openrouter">OpenRouter</option>
                   <option value="gemini">Google Gemini</option>
                   <option value="huggingface">HuggingFace</option>
-                  <option value="google">Google (Veo)</option>
+                  <option value="veo3api">Veo3 API (Video)</option>
                   <option value="custom">Custom</option>
                 </select>
               </div>
