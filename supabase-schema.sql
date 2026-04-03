@@ -31,7 +31,7 @@ CREATE TABLE public.ai_agents (
   name TEXT NOT NULL,
   description TEXT DEFAULT '',
   image_url TEXT DEFAULT '',
-  api_type TEXT NOT NULL CHECK (api_type IN ('openai', 'gemini', 'openrouter', 'custom')),
+  api_type TEXT NOT NULL CHECK (api_type IN ('openai', 'gemini', 'openrouter', 'custom', 'huggingface')),
   model TEXT NOT NULL,
   api_key_env TEXT NOT NULL,
   system_prompt TEXT DEFAULT 'You are a helpful AI assistant.',
