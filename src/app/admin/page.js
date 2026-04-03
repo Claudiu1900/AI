@@ -318,21 +318,65 @@ function TicketsTab({ supabase, currentUser }) {
 
   const fetchTickets = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from('tickets')
-      .select('*, profiles!tickets_user_id_fkey(display_name, username)')
-      .order('created_at', { ascending: false });
-    setTickets(data || []);
+    try {
+      // First try with join
+      const { data, error } = await supabase
+        .from('tickets')
+        .select('*, profiles(display_name, username)')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        // Fallback: fetch tickets without join, then fetch profiles separately
+        console.error('Tickets join error:', error);
+        const { data: ticketsOnly } = await supabase
+          .from('tickets')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (ticketsOnly && ticketsOnly.length > 0) {
+          const userIds = [...new Set(ticketsOnly.map(t => t.user_id))];
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('user_id, display_name, username')
+            .in('user_id', userIds);
+          const profileMap = {};
+          (profiles || []).forEach(p => { profileMap[p.user_id] = p; });
+          setTickets(ticketsOnly.map(t => ({ ...t, profiles: profileMap[t.user_id] || null })));
+        } else {
+          setTickets([]);
+        }
+      } else {
+        setTickets(data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch tickets:', err);
+      setTickets([]);
+    }
     setLoading(false);
   };
 
   const fetchTicketMessages = async (ticketId) => {
-    const { data } = await supabase
-      .from('ticket_messages')
-      .select('*, profiles!ticket_messages_user_id_fkey(display_name, username)')
-      .eq('ticket_id', ticketId)
-      .order('created_at', { ascending: true });
-    setTicketMessages(data || []);
+    try {
+      const { data, error } = await supabase
+        .from('ticket_messages')
+        .select('*, profiles(display_name, username)')
+        .eq('ticket_id', ticketId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        // Fallback without join
+        const { data: msgsOnly } = await supabase
+          .from('ticket_messages')
+          .select('*')
+          .eq('ticket_id', ticketId)
+          .order('created_at', { ascending: true });
+        setTicketMessages(msgsOnly || []);
+      } else {
+        setTicketMessages(data || []);
+      }
+    } catch {
+      setTicketMessages([]);
+    }
   };
 
   const openTicketDetail = (ticket) => {
@@ -352,7 +396,7 @@ function TicketsTab({ supabase, currentUser }) {
           message: replyMessage.trim(),
           is_admin: true,
         })
-        .select('*, profiles!ticket_messages_user_id_fkey(display_name, username)')
+        .select()
         .single();
 
       if (error) throw error;
