@@ -179,7 +179,9 @@ body {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);
   color: white;
-  padding: 0.65rem 0.875rem;
+  padding-top: 0.65rem;
+  padding-bottom: 0.65rem;
+  padding-right: 0.875rem;
   border-radius: 10px;
   font-size: 0.875rem;
   transition: all 0.2s ease;

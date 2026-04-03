@@ -240,7 +240,7 @@ export default function SettingsPage() {
                     <textarea
                       value={bio}
                       onChange={(e) => setBio(e.target.value)}
-                      className="input-dark min-h-[70px] resize-y text-[13px]"
+                      className="input-dark pl-3.5 min-h-[70px] resize-y text-[13px]"
                       placeholder="Tell us about yourself..."
                     />
                   </div>

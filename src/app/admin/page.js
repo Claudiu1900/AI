@@ -588,15 +588,15 @@ function AgentsTab({ supabase }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs text-gray-400 mb-1">Name</label>
-                <input value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="input-dark text-sm" placeholder="ChatGPT-4o" />
+                <input value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="input-dark pl-3.5 text-sm" placeholder="ChatGPT-4o" />
               </div>
               <div>
                 <label className="block text-xs text-gray-400 mb-1">Model ID</label>
-                <input value={form.model} onChange={e => setForm({...form, model: e.target.value})} className="input-dark text-sm" placeholder="gpt-4o" />
+                <input value={form.model} onChange={e => setForm({...form, model: e.target.value})} className="input-dark pl-3.5 text-sm" placeholder="gpt-4o" />
               </div>
               <div>
                 <label className="block text-xs text-gray-400 mb-1">API Type</label>
-                <select value={form.api_type} onChange={e => setForm({...form, api_type: e.target.value})} className="input-dark text-sm">
+                <select value={form.api_type} onChange={e => setForm({...form, api_type: e.target.value})} className="input-dark pl-3.5 text-sm">
                   <option value="openai">OpenAI</option>
                   <option value="gemini">Google Gemini</option>
                   <option value="custom">Custom</option>
@@ -604,27 +604,27 @@ function AgentsTab({ supabase }) {
               </div>
               <div>
                 <label className="block text-xs text-gray-400 mb-1">API Key Env Variable</label>
-                <input value={form.api_key_env} onChange={e => setForm({...form, api_key_env: e.target.value})} className="input-dark text-sm" placeholder="OPENAI_API_KEY" />
+                <input value={form.api_key_env} onChange={e => setForm({...form, api_key_env: e.target.value})} className="input-dark pl-3.5 text-sm" placeholder="OPENAI_API_KEY" />
               </div>
               <div>
                 <label className="block text-xs text-gray-400 mb-1">Max Tokens</label>
-                <input type="number" value={form.max_tokens} onChange={e => setForm({...form, max_tokens: parseInt(e.target.value)})} className="input-dark text-sm" />
+                <input type="number" value={form.max_tokens} onChange={e => setForm({...form, max_tokens: parseInt(e.target.value)})} className="input-dark pl-3.5 text-sm" />
               </div>
               <div>
                 <label className="block text-xs text-gray-400 mb-1">Temperature</label>
-                <input type="number" step="0.1" min="0" max="2" value={form.temperature} onChange={e => setForm({...form, temperature: parseFloat(e.target.value)})} className="input-dark text-sm" />
+                <input type="number" step="0.1" min="0" max="2" value={form.temperature} onChange={e => setForm({...form, temperature: parseFloat(e.target.value)})} className="input-dark pl-3.5 text-sm" />
               </div>
               <div>
                 <label className="block text-xs text-gray-400 mb-1">Image URL</label>
-                <input value={form.image_url} onChange={e => setForm({...form, image_url: e.target.value})} className="input-dark text-sm" placeholder="/agents/chatgpt.svg" />
+                <input value={form.image_url} onChange={e => setForm({...form, image_url: e.target.value})} className="input-dark pl-3.5 text-sm" placeholder="/agents/chatgpt.svg" />
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs text-gray-400 mb-1">Description</label>
-                <input value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="input-dark text-sm" placeholder="Description..." />
+                <input value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="input-dark pl-3.5 text-sm" placeholder="Description..." />
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs text-gray-400 mb-1">System Prompt</label>
-                <textarea value={form.system_prompt} onChange={e => setForm({...form, system_prompt: e.target.value})} className="input-dark text-sm min-h-[80px] resize-y" />
+                <textarea value={form.system_prompt} onChange={e => setForm({...form, system_prompt: e.target.value})} className="input-dark pl-3.5 text-sm min-h-[80px] resize-y" />
               </div>
               <div className="md:col-span-2 flex flex-wrap gap-4">
                 <label className="flex items-center space-x-2 cursor-pointer">
@@ -946,7 +946,7 @@ function SettingsTab({ supabase }) {
                         type={typeof value === 'number' ? 'number' : 'text'}
                         defaultValue={value}
                         onBlur={(e) => updateSetting(setting.id, setting.key, e.target.value)}
-                        className="input-dark text-[13px] w-36 text-right py-1"
+                        className="input-dark pl-3.5 text-[13px] w-36 text-right py-1"
                       />
                     )}
                   </div>

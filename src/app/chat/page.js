@@ -646,7 +646,7 @@ export default function ChatPage() {
                 placeholder={agents.length === 0 ? "No AI models available..." : "Type a message..."}
                 disabled={agents.length === 0 || sending}
                 rows={1}
-                className="input-dark resize-none min-h-[40px] max-h-32 pr-10 text-[13px]"
+                className="input-dark pl-3.5 resize-none min-h-[40px] max-h-32 pr-10 text-[13px]"
                 style={{ height: 'auto' }}
                 onInput={(e) => {
                   e.target.style.height = 'auto';
