@@ -1363,6 +1363,7 @@ function AgentsTab({ supabase }) {
                   <option value="openai">OpenAI</option>
                   <option value="openrouter">OpenRouter</option>
                   <option value="gemini">Google Gemini</option>
+                  <option value="huggingface">HuggingFace</option>
                   <option value="custom">Custom</option>
                 </select>
               </div>

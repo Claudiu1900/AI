@@ -69,6 +69,61 @@ export async function POST(req) {
       return NextResponse.json({ url });
     }
 
+    // HuggingFace FLUX.1-dev via HF Router
+    if (api_type === 'huggingface' && process.env.HF_TOKEN && !process.env.HF_TOKEN.includes('your_')) {
+      const enhancedPrompt = await enhancePrompt(prompt);
+      console.log('HF Enhanced prompt:', enhancedPrompt);
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 120000);
+
+      try {
+        const hfResponse = await fetch('https://router.huggingface.co/v1/images/generations', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.HF_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: model || 'black-forest-labs/FLUX.1-dev',
+            prompt: enhancedPrompt,
+          }),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeout);
+
+        if (!hfResponse.ok) {
+          const errText = await hfResponse.text();
+          console.error('HF API error:', hfResponse.status, errText);
+          throw new Error(`HuggingFace API error: ${hfResponse.status}`);
+        }
+
+        const hfData = await hfResponse.json();
+
+        if (!hfData.data || !hfData.data[0]) {
+          throw new Error('No image data returned from HuggingFace');
+        }
+
+        // HF returns base64 — convert to data URI
+        const b64 = hfData.data[0].b64_json;
+        if (b64) {
+          const dataUrl = `data:image/png;base64,${b64}`;
+          return NextResponse.json({ url: dataUrl });
+        }
+
+        // Some models may return a URL directly
+        if (hfData.data[0].url) {
+          return NextResponse.json({ url: hfData.data[0].url });
+        }
+
+        throw new Error('No image in HuggingFace response');
+      } catch (err) {
+        clearTimeout(timeout);
+        throw err;
+      }
+    }
+
     // Step 1: Enhance prompt using AI (translate + add detail)
     const enhancedPrompt = await enhancePrompt(prompt);
     console.log('Enhanced prompt:', enhancedPrompt);
