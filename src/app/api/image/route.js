@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { InferenceClient } from '@huggingface/inference';
 
 // Use Qwen via OpenRouter to enhance the user's prompt into a detailed English image prompt
 async function enhancePrompt(userPrompt) {
@@ -68,26 +67,6 @@ export async function POST(req) {
       }
 
       return NextResponse.json({ url });
-    }
-
-    // HuggingFace FLUX.1-dev via HF Inference SDK
-    if (api_type === 'huggingface' && process.env.HF_TOKEN && !process.env.HF_TOKEN.includes('your_')) {
-      const enhancedPrompt = await enhancePrompt(prompt);
-      console.log('HF Enhanced prompt:', enhancedPrompt);
-
-      const hfModel = model || 'black-forest-labs/FLUX.1-dev';
-      const client = new InferenceClient(process.env.HF_TOKEN);
-
-      const imageBlob = await client.textToImage({
-        model: hfModel,
-        inputs: enhancedPrompt,
-      });
-
-      const buffer = Buffer.from(await imageBlob.arrayBuffer());
-      const base64 = buffer.toString('base64');
-      const dataUrl = `data:image/png;base64,${base64}`;
-
-      return NextResponse.json({ url: dataUrl });
     }
 
     // Step 1: Enhance prompt using AI (translate + add detail)
