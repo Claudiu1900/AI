@@ -33,19 +33,41 @@ export default function SettingsPage() {
   useEffect(() => {
     if (!user) return;
     const fetchStats = async () => {
-      const [convs, msgs, access] = await Promise.all([
-        supabase.from('conversations').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
-        supabase.from('messages').select('id', { count: 'exact', head: true })
-          .in('conversation_id',
-            (await supabase.from('conversations').select('id').eq('user_id', user.id)).data?.map(c => c.id) || []
-          ),
-        supabase.from('user_ai_access').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('is_active', true),
-      ]);
-      setStats({
-        conversations: convs.count || 0,
-        messages: msgs.count || 0,
-        agents: access.count || 0,
-      });
+      try {
+        const convRes = await supabase
+          .from('conversations')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id);
+
+        const { data: convIds } = await supabase
+          .from('conversations')
+          .select('id')
+          .eq('user_id', user.id);
+
+        const ids = convIds?.map(c => c.id) || [];
+        let msgCount = 0;
+        if (ids.length > 0) {
+          const msgRes = await supabase
+            .from('messages')
+            .select('id', { count: 'exact', head: true })
+            .in('conversation_id', ids);
+          msgCount = msgRes.count || 0;
+        }
+
+        const accessRes = await supabase
+          .from('user_ai_access')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('is_active', true);
+
+        setStats({
+          conversations: convRes.count || 0,
+          messages: msgCount,
+          agents: accessRes.count || 0,
+        });
+      } catch (err) {
+        console.error('Failed to fetch stats:', err);
+      }
     };
     fetchStats();
   }, [user]);
@@ -351,8 +373,12 @@ export default function SettingsPage() {
                     </div>
                     <div className="flex justify-between items-center p-2.5 rounded-lg bg-white/[0.03]">
                       <span className="text-[13px] text-zinc-400">Role</span>
-                      <span className={`text-[13px] ${profile?.is_admin ? 'text-indigo-400' : 'text-zinc-300'}`}>
-                        {profile?.is_admin ? 'Admin' : 'User'}
+                      <span className={`text-[13px] font-medium ${
+                        profile?.role === 'owner' ? 'text-amber-400' :
+                        profile?.role === 'admin' || profile?.is_admin ? 'text-indigo-400' : 'text-zinc-300'
+                      }`}>
+                        {profile?.role === 'owner' ? 'Owner' :
+                         profile?.role === 'admin' || profile?.is_admin ? 'Admin' : 'User'}
                       </span>
                     </div>
                     <div className="flex justify-between items-center p-2.5 rounded-lg bg-white/[0.03]">

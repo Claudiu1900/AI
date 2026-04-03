@@ -2,10 +2,11 @@
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useAuth } from '@/components/AuthProvider';
 import { useEffect, useState } from 'react';
 import {
-  Sparkles, MessageSquare, Image, Mic, Shield, Zap, Brain,
+  Sparkles, MessageSquare, Image as ImageIcon, Mic, Shield, Zap, Brain,
   ArrowRight, Star, Users, Globe, Lock, ChevronRight
 } from 'lucide-react';
 
@@ -24,19 +25,23 @@ export default function HomePage() {
 
   useEffect(() => {
     const fetchStats = async () => {
-      const [profilesRes, convsRes, msgsRes] = await Promise.all([
-        supabase.from('profiles').select('id', { count: 'exact', head: true }),
-        supabase.from('conversations').select('id', { count: 'exact', head: true }),
-        supabase.from('messages').select('id', { count: 'exact', head: true }),
-      ]);
-      setStats({
-        users: profilesRes.count || 0,
-        chats: convsRes.count || 0,
-        messages: msgsRes.count || 0,
-      });
+      try {
+        const [profilesRes, convsRes, msgsRes] = await Promise.all([
+          supabase.from('profiles').select('id', { count: 'exact', head: true }),
+          supabase.from('conversations').select('id', { count: 'exact', head: true }),
+          supabase.from('messages').select('id', { count: 'exact', head: true }),
+        ]);
+        setStats({
+          users: profilesRes.count || 0,
+          chats: convsRes.count || 0,
+          messages: msgsRes.count || 0,
+        });
+      } catch (err) {
+        console.error('Failed to fetch stats:', err);
+      }
     };
-    fetchStats();
-  }, []);
+    if (supabase) fetchStats();
+  }, [supabase]);
 
   const features = [
     {
@@ -52,7 +57,7 @@ export default function HomePage() {
       color: 'bg-violet-500/10 text-violet-400',
     },
     {
-      icon: Image,
+      icon: ImageIcon,
       title: 'Image Generation',
       description: 'Create visuals with FLUX, DALL-E and other generation models.',
       color: 'bg-emerald-500/10 text-emerald-400',
@@ -237,9 +242,7 @@ export default function HomePage() {
       <footer className="py-8 px-4 border-t border-white/[0.04]">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center space-x-2">
-            <div className="w-6 h-6 rounded-md bg-indigo-500 flex items-center justify-center">
-              <Sparkles className="w-3 h-3 text-white" />
-            </div>
+            <Image src="/toxiqailogo.png" alt="ToxiQ AI" width={24} height={24} className="rounded-md" />
             <span className="text-sm font-semibold">ToxiQ AI</span>
           </div>
           <p className="text-xs text-zinc-600">

@@ -4,8 +4,10 @@ import { useState } from 'react';
 import { createClient } from '@/lib/supabase-browser';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { Mail, Lock, Eye, EyeOff, Sparkles, ArrowRight, User, AtSign } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, User, AtSign } from 'lucide-react';
+import Image from 'next/image';
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
@@ -17,6 +19,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const supabase = createClient();
+  const router = useRouter();
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -55,23 +58,43 @@ export default function RegisterPage() {
       return;
     }
 
+    // Check if email verification is required
+    const { data: verifySettingData } = await supabase
+      .from('admin_settings')
+      .select('value')
+      .eq('key', 'require_email_verification')
+      .single();
+
+    const requireVerification = verifySettingData
+      ? JSON.parse(verifySettingData.value) === true || JSON.parse(verifySettingData.value) === 'true'
+      : true;
+
+    const signUpOptions = {
+      data: {
+        username: username.toLowerCase(),
+        display_name: displayName,
+      },
+    };
+
+    if (requireVerification) {
+      signUpOptions.emailRedirectTo = `${window.location.origin}/login`;
+    }
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: {
-          username: username.toLowerCase(),
-          display_name: displayName,
-        },
-        emailRedirectTo: `${window.location.origin}/login`,
-      },
+      options: signUpOptions,
     });
 
     if (error) {
       toast.error(error.message);
-    } else {
+    } else if (requireVerification) {
       setEmailSent(true);
       toast.success('Verification email sent! Check your inbox.');
+    } else {
+      toast.success('Account created! Redirecting...');
+      router.push('/chat');
+      router.refresh();
     }
     setLoading(false);
   };
@@ -89,7 +112,7 @@ export default function RegisterPage() {
           </div>
           <h2 className="text-xl font-bold mb-2">Check your email</h2>
           <p className="text-sm text-zinc-400 mb-5">
-            We sent a verification link to <span className="text-indigo-400">{email}</span>.
+            We sent a verification link to <span className="text-indigo-400 font-medium">{email}</span>.
           </p>
           <Link href="/login" className="inline-block text-sm font-medium bg-indigo-500 hover:bg-indigo-400 text-white px-5 py-2 rounded-lg transition-colors">
             Go to Login
@@ -107,12 +130,10 @@ export default function RegisterPage() {
         transition={{ duration: 0.4 }}
         className="w-full max-w-sm"
       >
-        <div className="glass-card p-7">
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-8 backdrop-blur-sm">
           <div className="text-center mb-6">
-            <div className="w-11 h-11 rounded-xl bg-violet-500 flex items-center justify-center mx-auto mb-3">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <h1 className="text-xl font-bold mb-1">Create account</h1>
+            <Image src="/toxiqailogo.png" alt="ToxiQ AI" width={48} height={48} className="mx-auto mb-4 rounded-xl" />
+            <h1 className="text-2xl font-bold mb-1.5">Create account</h1>
             <p className="text-sm text-zinc-400">Join ToxiQ AI today</p>
           </div>
 

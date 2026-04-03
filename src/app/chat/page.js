@@ -13,12 +13,12 @@ import {
 } from 'lucide-react';
 
 export default function ChatPage() {
-  const { user, profile, supabase } = useAuth();
+  const { user, profile, supabase, loading: authLoading } = useAuth();
   const [conversations, setConversations] = useState([]);
   const [currentConv, setCurrentConv] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [agents, setAgents] = useState([]);
   const [selectedAgent, setSelectedAgent] = useState(null);
@@ -33,46 +33,55 @@ export default function ChatPage() {
 
   // Fetch user's accessible agents
   useEffect(() => {
-    if (!user) return;
+    if (!user || authLoading) return;
     const fetchAgents = async () => {
-      const { data: access } = await supabase
-        .from('user_ai_access')
-        .select('*, ai_agents(*)')
-        .eq('user_id', user.id)
-        .eq('is_active', true);
+      try {
+        const { data: access } = await supabase
+          .from('user_ai_access')
+          .select('*, ai_agents(*)')
+          .eq('user_id', user.id)
+          .eq('is_active', true);
 
-      if (access && access.length > 0) {
-        const agentList = access
-          .filter(a => a.ai_agents?.is_active)
-          .map(a => ({
-            ...a.ai_agents,
-            allowed_prompts: a.allowed_prompts,
-            used_prompts: a.used_prompts,
-          }));
-        setAgents(agentList);
-        if (agentList.length > 0 && !selectedAgent) {
-          setSelectedAgent(agentList[0]);
+        if (access && access.length > 0) {
+          const agentList = access
+            .filter(a => a.ai_agents?.is_active)
+            .map(a => ({
+              ...a.ai_agents,
+              allowed_prompts: a.allowed_prompts,
+              used_prompts: a.used_prompts,
+            }));
+          setAgents(agentList);
+          if (agentList.length > 0 && !selectedAgent) {
+            setSelectedAgent(agentList[0]);
+          }
         }
+      } catch (err) {
+        console.error('Failed to fetch agents:', err);
       }
     };
     fetchAgents();
-  }, [user]);
+  }, [user, authLoading]);
 
   // Fetch conversations
   useEffect(() => {
-    if (!user) return;
+    if (!user || authLoading) return;
     const fetchConversations = async () => {
       setLoading(true);
-      const { data } = await supabase
-        .from('conversations')
-        .select('*, ai_agents(name, image_url)')
-        .eq('user_id', user.id)
-        .order('updated_at', { ascending: false });
-      setConversations(data || []);
-      setLoading(false);
+      try {
+        const { data } = await supabase
+          .from('conversations')
+          .select('*, ai_agents(name, image_url)')
+          .eq('user_id', user.id)
+          .order('updated_at', { ascending: false });
+        setConversations(data || []);
+      } catch (err) {
+        console.error('Failed to fetch conversations:', err);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchConversations();
-  }, [user]);
+  }, [user, authLoading]);
 
   // Fetch messages for current conversation
   useEffect(() => {
@@ -358,6 +367,14 @@ export default function ChatPage() {
     setInput(prev => prev + (prev ? ' ' : '') + text);
     inputRef.current?.focus();
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center">
+        <div className="w-6 h-6 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">

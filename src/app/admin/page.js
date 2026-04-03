@@ -23,20 +23,21 @@ const tabs = [
 ];
 
 export default function AdminPage() {
-  const { user, profile, supabase } = useAuth();
+  const { user, profile, supabase, loading: authLoading } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!profile?.is_admin) {
+    if (authLoading) return;
+    if (!profile?.is_admin && profile?.role !== 'owner') {
       router.push('/chat');
       return;
     }
     setLoading(false);
-  }, [profile]);
+  }, [profile, authLoading]);
 
-  if (loading || !profile?.is_admin) {
+  if (loading || (!profile?.is_admin && profile?.role !== 'owner')) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="w-6 h-6 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
@@ -78,7 +79,7 @@ export default function AdminPage() {
       <div className="flex-1 overflow-y-auto p-3 sm:p-5">
         <AnimatePresence mode="wait">
           {activeTab === 'dashboard' && <DashboardTab key="dashboard" supabase={supabase} />}
-          {activeTab === 'users' && <UsersTab key="users" supabase={supabase} currentUser={user} />}
+          {activeTab === 'users' && <UsersTab key="users" supabase={supabase} currentUser={user} currentProfile={profile} />}
           {activeTab === 'agents' && <AgentsTab key="agents" supabase={supabase} />}
           {activeTab === 'statistics' && <StatisticsTab key="statistics" supabase={supabase} />}
           {activeTab === 'settings' && <SettingsTab key="settings" supabase={supabase} />}
@@ -203,7 +204,7 @@ function DashboardTab({ supabase }) {
 // ============================================
 // USERS TAB
 // ============================================
-function UsersTab({ supabase, currentUser }) {
+function UsersTab({ supabase, currentUser, currentProfile }) {
   const [users, setUsers] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -240,14 +241,31 @@ function UsersTab({ supabase, currentUser }) {
   };
 
   const toggleAdmin = async (userId, isAdmin) => {
+    const newIsAdmin = !isAdmin;
+    const newRole = newIsAdmin ? 'admin' : 'user';
     const { error } = await supabase
       .from('profiles')
-      .update({ is_admin: !isAdmin })
+      .update({ is_admin: newIsAdmin, role: newRole })
       .eq('user_id', userId);
 
     if (!error) {
-      setUsers(prev => prev.map(u => u.user_id === userId ? { ...u, is_admin: !isAdmin } : u));
-      toast.success(`Admin ${!isAdmin ? 'granted' : 'revoked'}`);
+      setUsers(prev => prev.map(u => u.user_id === userId ? { ...u, is_admin: newIsAdmin, role: newRole } : u));
+      setSelectedUser(prev => prev && prev.user_id === userId ? { ...prev, is_admin: newIsAdmin, role: newRole } : prev);
+      toast.success(`Role updated to ${newRole}`);
+    }
+  };
+
+  const setUserRole = async (userId, role) => {
+    const isAdmin = role === 'admin' || role === 'owner';
+    const { error } = await supabase
+      .from('profiles')
+      .update({ role, is_admin: isAdmin })
+      .eq('user_id', userId);
+
+    if (!error) {
+      setUsers(prev => prev.map(u => u.user_id === userId ? { ...u, role, is_admin: isAdmin } : u));
+      setSelectedUser(prev => prev && prev.user_id === userId ? { ...prev, role, is_admin: isAdmin } : prev);
+      toast.success(`Role updated to ${role}`);
     }
   };
 
@@ -350,7 +368,17 @@ function UsersTab({ supabase, currentUser }) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-1.5">
                         <p className="font-medium text-[13px]">{u.display_name}</p>
-                        {u.is_admin && (
+                        {u.role === 'owner' && (
+                          <span className="px-1 py-0.5 rounded bg-amber-500/10 text-amber-400 text-[9px] font-bold">
+                            OWNER
+                          </span>
+                        )}
+                        {u.role === 'admin' && (
+                          <span className="px-1 py-0.5 rounded bg-indigo-500/10 text-indigo-400 text-[9px] font-bold">
+                            ADMIN
+                          </span>
+                        )}
+                        {(!u.role || u.role === 'user') && u.is_admin && (
                           <span className="px-1 py-0.5 rounded bg-indigo-500/10 text-indigo-400 text-[9px] font-bold">
                             ADMIN
                           </span>
@@ -391,22 +419,40 @@ function UsersTab({ supabase, currentUser }) {
                 <p className="text-[13px] text-zinc-500">@{selectedUser.username}</p>
               </div>
 
-              {/* Admin toggle */}
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] mb-3">
-                <div className="flex items-center space-x-1.5">
+              {/* Role Management */}
+              <div className="mb-3">
+                <h4 className="text-[13px] font-semibold mb-2 flex items-center space-x-1.5">
                   <Shield className="w-3.5 h-3.5 text-indigo-400" />
-                  <span className="text-[13px]">Admin Access</span>
+                  <span>Role</span>
+                </h4>
+                <div className="space-y-1">
+                  {['user', 'admin', ...(currentProfile?.role === 'owner' ? ['owner'] : [])].map(role => {
+                    const isCurrentRole = (selectedUser.role || 'user') === role;
+                    const roleColors = {
+                      user: 'border-zinc-500/20 text-zinc-400',
+                      admin: 'border-indigo-500/20 text-indigo-400',
+                      owner: 'border-amber-500/20 text-amber-400',
+                    };
+                    const activeBg = {
+                      user: 'bg-zinc-500/10 border-zinc-500/30',
+                      admin: 'bg-indigo-500/10 border-indigo-500/30',
+                      owner: 'bg-amber-500/10 border-amber-500/30',
+                    };
+                    return (
+                      <button
+                        key={role}
+                        onClick={() => setUserRole(selectedUser.user_id, role)}
+                        disabled={role === 'owner' && currentProfile?.role !== 'owner'}
+                        className={`w-full flex items-center justify-between p-2.5 rounded-lg border transition-colors text-[13px] font-medium ${
+                          isCurrentRole ? activeBg[role] : `bg-white/[0.02] ${roleColors[role]} hover:bg-white/[0.04]`
+                        } disabled:opacity-30 disabled:cursor-not-allowed`}
+                      >
+                        <span className="capitalize">{role}</span>
+                        {isCurrentRole && <Check className="w-3.5 h-3.5" />}
+                      </button>
+                    );
+                  })}
                 </div>
-                <button
-                  onClick={() => toggleAdmin(selectedUser.user_id, selectedUser.is_admin)}
-                  className={`w-10 h-5 rounded-full transition-colors ${
-                    selectedUser.is_admin ? 'bg-indigo-500' : 'bg-zinc-700'
-                  } relative`}
-                >
-                  <div className={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all ${
-                    selectedUser.is_admin ? 'left-[22px]' : 'left-0.5'
-                  }`} />
-                </button>
               </div>
 
               {/* AI Access Management */}

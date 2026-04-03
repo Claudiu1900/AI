@@ -16,6 +16,7 @@ CREATE TABLE public.profiles (
   display_name TEXT NOT NULL,
   avatar_url TEXT,
   bio TEXT DEFAULT '',
+  role TEXT DEFAULT 'user' CHECK (role IN ('user', 'admin', 'owner')),
   is_admin BOOLEAN DEFAULT FALSE,
   theme TEXT DEFAULT 'dark',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -287,6 +288,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 INSERT INTO public.admin_settings (key, value, description) VALUES
   ('admin_panel_visible', '"true"', 'Whether the admin panel tab is visible'),
   ('registration_enabled', '"true"', 'Whether new registrations are allowed'),
+  ('require_email_verification', '"true"', 'Whether new users must verify their email before logging in'),
   ('default_theme', '"dark"', 'Default theme for new users'),
   ('maintenance_mode', '"false"', 'Whether the site is in maintenance mode'),
   ('max_messages_per_day', '1000', 'Maximum messages per user per day'),

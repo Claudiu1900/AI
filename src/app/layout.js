@@ -8,7 +8,8 @@ export const metadata = {
   title: 'ToxiQ AI — Intelligent Conversations',
   description: 'Chat with multiple AI models, generate images, and send voice messages — all in one beautiful interface.',
   icons: {
-    icon: '/favicon.ico',
+    icon: '/toxiqailogo.png',
+    apple: '/toxiqailogo.png',
   },
 };
 

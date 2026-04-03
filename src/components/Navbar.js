@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useAuth } from './AuthProvider';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -23,7 +24,7 @@ export default function Navbar() {
       { href: '/chat', label: 'Chat', icon: MessageSquare },
       { href: '/settings', label: 'Settings', icon: Settings },
     ] : []),
-    ...(profile?.is_admin ? [
+    ...(profile?.is_admin || profile?.role === 'owner' ? [
       { href: '/admin', label: 'Admin', icon: Shield },
     ] : []),
   ];
@@ -49,9 +50,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-14">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-white" />
-            </div>
+            <Image src="/toxiqailogo.png" alt="ToxiQ AI" width={32} height={32} className="rounded-lg" />
             <span className="text-base font-bold tracking-tight">ToxiQ AI</span>
           </Link>
 
