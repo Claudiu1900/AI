@@ -69,24 +69,24 @@ export async function POST(req) {
       return NextResponse.json({ url });
     }
 
-    // HuggingFace FLUX.1-dev via HF Router
+    // HuggingFace FLUX.1-dev via HF Inference API
     if (api_type === 'huggingface' && process.env.HF_TOKEN && !process.env.HF_TOKEN.includes('your_')) {
       const enhancedPrompt = await enhancePrompt(prompt);
       console.log('HF Enhanced prompt:', enhancedPrompt);
 
+      const hfModel = model || 'black-forest-labs/FLUX.1-dev';
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 120000);
 
       try {
-        const hfResponse = await fetch('https://router.huggingface.co/v1/images/generations', {
+        const hfResponse = await fetch(`https://api-inference.huggingface.co/models/${hfModel}`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${process.env.HF_TOKEN}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: model || 'black-forest-labs/FLUX.1-dev',
-            prompt: enhancedPrompt,
+            inputs: enhancedPrompt,
           }),
           signal: controller.signal,
         });
@@ -99,25 +99,13 @@ export async function POST(req) {
           throw new Error(`HuggingFace API error: ${hfResponse.status}`);
         }
 
-        const hfData = await hfResponse.json();
+        // HF Inference API returns raw image bytes
+        const imageBuffer = await hfResponse.arrayBuffer();
+        const base64 = Buffer.from(imageBuffer).toString('base64');
+        const contentType = hfResponse.headers.get('content-type') || 'image/png';
+        const dataUrl = `data:${contentType};base64,${base64}`;
 
-        if (!hfData.data || !hfData.data[0]) {
-          throw new Error('No image data returned from HuggingFace');
-        }
-
-        // HF returns base64 — convert to data URI
-        const b64 = hfData.data[0].b64_json;
-        if (b64) {
-          const dataUrl = `data:image/png;base64,${b64}`;
-          return NextResponse.json({ url: dataUrl });
-        }
-
-        // Some models may return a URL directly
-        if (hfData.data[0].url) {
-          return NextResponse.json({ url: hfData.data[0].url });
-        }
-
-        throw new Error('No image in HuggingFace response');
+        return NextResponse.json({ url: dataUrl });
       } catch (err) {
         clearTimeout(timeout);
         throw err;
