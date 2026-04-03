@@ -250,6 +250,7 @@ function TicketsTab({ supabase, currentUser }) {
   const [replyMessage, setReplyMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [stats, setStats] = useState({ total: 0, open: 0, closed: 0, byCategory: {} });
+  const [refreshing, setRefreshing] = useState(false);
   const messagesEndRef = useRef(null);
   const channelRef = useRef(null);
 
@@ -275,6 +276,19 @@ function TicketsTab({ supabase, currentUser }) {
       }, (payload) => {
         setTicketMessages(prev => {
           if (prev.find(m => m.id === payload.new.id)) return prev;
+          if (!payload.new.is_admin) {
+            toast.custom((t) => (
+              <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} flex items-center space-x-3 px-5 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-500/90 to-purple-500/90 text-white shadow-2xl shadow-indigo-500/25 backdrop-blur-xl border border-white/20`}>
+                <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+                  <Ticket className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Ticket Updated!</p>
+                  <p className="text-xs text-white/70">New message received</p>
+                </div>
+              </div>
+            ), { duration: 3000 });
+          }
           return [...prev, payload.new];
         });
       })
@@ -504,6 +518,21 @@ function TicketsTab({ supabase, currentUser }) {
         </div>
 
         {/* Messages */}
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[11px] text-zinc-500 font-medium tracking-wide uppercase">Conversation</span>
+          <button
+            onClick={async () => {
+              setRefreshing(true);
+              await fetchTicketMessages(selectedTicket.id);
+              setTimeout(() => setRefreshing(false), 600);
+            }}
+            className="group flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-white/[0.03] hover:bg-indigo-500/10 border border-white/[0.06] hover:border-indigo-500/20 text-zinc-400 hover:text-indigo-400 transition-all duration-300"
+            title="Refresh messages"
+          >
+            <RefreshCw className={`w-3 h-3 transition-transform duration-700 ease-in-out ${refreshing ? 'animate-spin' : 'group-hover:rotate-180'}`} />
+            <span className="text-[10px] font-medium">Refresh</span>
+          </button>
+        </div>
         <div className="space-y-2 mb-4 max-h-[45vh] overflow-y-auto pr-1">
           {ticketMessages.map(msg => (
             <div key={msg.id} className={`p-3.5 rounded-xl ${msg.is_admin ? 'bg-indigo-500/5 border border-indigo-500/10 ml-8' : 'bg-white/[0.03] border border-white/[0.05] mr-8'}`}>
