@@ -1218,7 +1218,7 @@ function AgentsTab({ supabase }) {
     name: '', description: '', api_type: 'openai', model: '',
     api_key_env: 'OPENAI_API_KEY', system_prompt: 'You are a helpful AI assistant.',
     max_tokens: 4096, temperature: 0.7, supports_images: false,
-    supports_voice: false, supports_image_generation: false, image_url: '',
+    supports_voice: false, supports_image_generation: false, image_url: '', is_default: false,
   });
 
   useEffect(() => {
@@ -1248,7 +1248,7 @@ function AgentsTab({ supabase }) {
       name: '', description: '', api_type: 'openai', model: '',
       api_key_env: 'OPENAI_API_KEY', system_prompt: 'You are a helpful AI assistant.',
       max_tokens: 4096, temperature: 0.7, supports_images: false,
-      supports_voice: false, supports_image_generation: false, image_url: '',
+      supports_voice: false, supports_image_generation: false, image_url: '', is_default: false,
     });
     fetchAgents();
   };
@@ -1276,6 +1276,7 @@ function AgentsTab({ supabase }) {
       supports_voice: agent.supports_voice,
       supports_image_generation: agent.supports_image_generation,
       image_url: agent.image_url,
+      is_default: agent.is_default || false,
     });
     setShowNew(true);
   };
@@ -1285,12 +1286,21 @@ function AgentsTab({ supabase }) {
     fetchAgents();
   };
 
+  const setDefault = async (id) => {
+    // Clear all defaults first, then set the new one
+    await supabase.from('ai_agents').update({ is_default: false }).neq('id', id);
+    await supabase.from('ai_agents').update({ is_default: true }).eq('id', id);
+    toast.success('Default agent set');
+    fetchAgents();
+  };
+
   const duplicateAgent = async (agent) => {
     const { id, created_at, updated_at, ...agentData } = agent;
     const { error } = await supabase.from('ai_agents').insert({
       ...agentData,
       name: `${agent.name} (Copy)`,
       is_active: false,
+      is_default: false,
     });
     if (!error) {
       toast.success(`Duplicated "${agent.name}"`);
@@ -1314,7 +1324,7 @@ function AgentsTab({ supabase }) {
             name: '', description: '', api_type: 'openai', model: '',
             api_key_env: 'OPENAI_API_KEY', system_prompt: 'You are a helpful AI assistant.',
             max_tokens: 4096, temperature: 0.7, supports_images: false,
-            supports_voice: false, supports_image_generation: false, image_url: '',
+            supports_voice: false, supports_image_generation: false, image_url: '', is_default: false,
           }); }}
           className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[13px] font-medium hover:border-indigo-500/30 transition-colors"
         >
@@ -1429,7 +1439,10 @@ function AgentsTab({ supabase }) {
                 </button>
               </div>
             </div>
-            <h3 className="text-[13px] font-semibold mb-0.5">{agent.name}</h3>
+            <h3 className="text-[13px] font-semibold mb-0.5">
+              {agent.name}
+              {agent.is_default && <span className="ml-1.5 text-[9px] text-amber-400 font-bold">★ DEFAULT</span>}
+            </h3>
             <p className="text-[11px] text-zinc-500 mb-2 line-clamp-2">{agent.description}</p>
             <div className="flex flex-wrap gap-1 mt-2">
               <span className="px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 text-[10px]">{agent.api_type}</span>
@@ -1438,6 +1451,14 @@ function AgentsTab({ supabase }) {
               {agent.supports_voice && <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 text-[10px]">Voice</span>}
               {agent.supports_image_generation && <span className="px-1.5 py-0.5 rounded bg-pink-500/10 text-pink-400 text-[10px]">Gen Images</span>}
             </div>
+            {!agent.is_default && (
+              <button
+                onClick={() => setDefault(agent.id)}
+                className="mt-2 w-full text-[10px] font-medium text-amber-400/70 hover:text-amber-400 py-1 rounded-lg border border-amber-500/10 hover:border-amber-500/20 hover:bg-amber-500/5 transition-all"
+              >
+                ★ Set as Default
+              </button>
+            )}
           </div>
         ))}
       </div>

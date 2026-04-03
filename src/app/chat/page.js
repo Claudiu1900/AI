@@ -55,7 +55,8 @@ export default function ChatPage() {
             }));
           setAgents(agentList);
           if (agentList.length > 0 && !selectedAgent) {
-            setSelectedAgent(agentList[0]);
+            const defaultAgent = agentList.find(a => a.is_default) || agentList[0];
+            setSelectedAgent(defaultAgent);
           }
         }
       } catch (err) {
@@ -435,7 +436,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">
+    <div className="flex h-[calc(100dvh-3.5rem)] overflow-hidden">
       {/* Mobile sidebar backdrop */}
       <AnimatePresence>
         {sidebarOpen && (
@@ -706,7 +707,27 @@ export default function ChatPage() {
         </AnimatePresence>
 
         {/* Input area */}
-        <div className="bg-[#09090b]/90 backdrop-blur-lg border-t border-white/[0.04] p-3">
+        <div className="bg-[#09090b]/90 backdrop-blur-lg border-t border-white/[0.04] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          {/* Agent selector row */}
+          {agents.length > 1 && (
+            <div className="flex items-center space-x-1.5 mb-2 overflow-x-auto pb-1 scrollbar-hide">
+              {agents.map(agent => (
+                <button
+                  key={agent.id}
+                  onClick={() => setSelectedAgent(agent)}
+                  className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium whitespace-nowrap transition-all ${
+                    selectedAgent?.id === agent.id
+                      ? 'bg-indigo-500/15 border border-indigo-500/25 text-indigo-300'
+                      : 'bg-white/[0.03] border border-white/[0.05] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
+                  }`}
+                >
+                  <Bot className="w-3 h-3" />
+                  <span>{agent.name}</span>
+                  {agent.is_default && <span className="text-[8px] text-amber-400">★</span>}
+                </button>
+              ))}
+            </div>
+          )}
           <form onSubmit={sendMessage} className="flex items-end space-x-2">
             {/* Image upload */}
             <input
