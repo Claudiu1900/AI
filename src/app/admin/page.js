@@ -13,7 +13,7 @@ import {
   Database, Globe, Lock, Unlock, RefreshCw, Download,
   TrendingUp, Hash, Ticket, Send, ArrowLeft, RotateCcw,
   CheckCircle2, XCircle, AlertTriangle, Bug, HelpCircle,
-  Lightbulb, Filter
+  Lightbulb, Filter, Copy, Camera, Loader2, AtSign, User as UserIcon
 } from 'lucide-react';
 
 const tabs = [
@@ -274,21 +274,21 @@ function TicketsTab({ supabase, currentUser }) {
         table: 'ticket_messages',
         filter: `ticket_id=eq.${selectedTicket.id}`,
       }, (payload) => {
+        if (!payload.new.is_admin) {
+          toast.custom((t) => (
+            <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} flex items-center space-x-3 px-5 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-500/90 to-purple-500/90 text-white shadow-2xl shadow-indigo-500/25 backdrop-blur-xl border border-white/20`}>
+              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+                <Ticket className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">Ticket Updated!</p>
+                <p className="text-xs text-white/70">New message received</p>
+              </div>
+            </div>
+          ), { duration: 3000 });
+        }
         setTicketMessages(prev => {
           if (prev.find(m => m.id === payload.new.id)) return prev;
-          if (!payload.new.is_admin) {
-            toast.custom((t) => (
-              <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} flex items-center space-x-3 px-5 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-500/90 to-purple-500/90 text-white shadow-2xl shadow-indigo-500/25 backdrop-blur-xl border border-white/20`}>
-                <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-                  <Ticket className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold">Ticket Updated!</p>
-                  <p className="text-xs text-white/70">New message received</p>
-                </div>
-              </div>
-            ), { duration: 3000 });
-          }
           return [...prev, payload.new];
         });
       })
@@ -716,6 +716,13 @@ function UsersTab({ supabase, currentUser, currentProfile }) {
   const [selectedUser, setSelectedUser] = useState(null);
   const [agents, setAgents] = useState([]);
   const [userAccess, setUserAccess] = useState([]);
+  const [editingUser, setEditingUser] = useState(false);
+  const [editForm, setEditForm] = useState({ display_name: '', username: '', bio: '' });
+  const [editSaving, setEditSaving] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef(null);
 
   useEffect(() => {
     fetchUsers();
@@ -815,6 +822,99 @@ function UsersTab({ supabase, currentUser, currentProfile }) {
     }
   };
 
+  const startEditUser = () => {
+    setEditingUser(true);
+    setEditForm({
+      display_name: selectedUser.display_name || '',
+      username: selectedUser.username || '',
+      bio: selectedUser.bio || '',
+    });
+    setNewPassword('');
+  };
+
+  const saveUserEdit = async () => {
+    setEditSaving(true);
+    if (editForm.username !== selectedUser.username) {
+      const { data: existing } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', editForm.username.toLowerCase())
+        .neq('user_id', selectedUser.user_id)
+        .single();
+      if (existing) {
+        toast.error('Username already taken');
+        setEditSaving(false);
+        return;
+      }
+    }
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        display_name: editForm.display_name,
+        username: editForm.username.toLowerCase(),
+        bio: editForm.bio,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', selectedUser.user_id);
+    if (!error) {
+      toast.success('User profile updated');
+      setUsers(prev => prev.map(u => u.user_id === selectedUser.user_id ? { ...u, ...editForm, username: editForm.username.toLowerCase() } : u));
+      setSelectedUser(prev => ({ ...prev, ...editForm, username: editForm.username.toLowerCase() }));
+      setEditingUser(false);
+    } else {
+      toast.error('Failed to update');
+    }
+    setEditSaving(false);
+  };
+
+  const resetUserPassword = async () => {
+    if (!newPassword || newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    setSavingPassword(true);
+    try {
+      const res = await fetch('/api/admin/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: selectedUser.user_id, newPassword }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      toast.success('Password reset successfully');
+      setNewPassword('');
+    } catch (err) {
+      toast.error(err.message || 'Failed to reset password');
+    }
+    setSavingPassword(false);
+  };
+
+  const uploadUserAvatar = async (file) => {
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image must be under 2MB');
+      return;
+    }
+    setUploadingAvatar(true);
+    try {
+      const ext = file.name.split('.').pop();
+      const fileName = `${selectedUser.user_id}-${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+      await supabase.from('profiles').update({ avatar_url: publicUrl, updated_at: new Date().toISOString() }).eq('user_id', selectedUser.user_id);
+      setUsers(prev => prev.map(u => u.user_id === selectedUser.user_id ? { ...u, avatar_url: publicUrl } : u));
+      setSelectedUser(prev => ({ ...prev, avatar_url: publicUrl }));
+      toast.success('Avatar updated');
+    } catch (err) {
+      toast.error('Failed to upload avatar');
+    }
+    setUploadingAvatar(false);
+  };
+
   const filteredUsers = users.filter(u =>
     u.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     u.display_name?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -907,22 +1007,102 @@ function UsersTab({ supabase, currentUser, currentProfile }) {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.2 }}
-              className="w-80 bg-white/[0.03] border border-white/[0.05] rounded-xl p-5 self-start"
+              className="w-80 bg-white/[0.03] border border-white/[0.05] rounded-xl p-5 self-start max-h-[80vh] overflow-y-auto"
             >
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold">User Details</h3>
-                <button onClick={() => setSelectedUser(null)} className="p-1 rounded-md hover:bg-white/[0.04]">
-                  <X className="w-3.5 h-3.5 text-zinc-400" />
-                </button>
+                <div className="flex items-center space-x-1">
+                  {currentProfile?.role === 'owner' && !editingUser && (
+                    <button onClick={startEditUser} className="p-1 rounded-md hover:bg-white/[0.04]" title="Edit user">
+                      <Edit3 className="w-3.5 h-3.5 text-indigo-400" />
+                    </button>
+                  )}
+                  <button onClick={() => { setSelectedUser(null); setEditingUser(false); }} className="p-1 rounded-md hover:bg-white/[0.04]">
+                    <X className="w-3.5 h-3.5 text-zinc-400" />
+                  </button>
+                </div>
               </div>
 
+              {/* Avatar */}
               <div className="text-center mb-4">
-                <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center text-lg font-bold text-indigo-300 mx-auto mb-2">
-                  {selectedUser.display_name?.[0]?.toUpperCase()}
+                <div className="relative group mx-auto w-14 h-14 mb-2">
+                  <div className="w-14 h-14 rounded-xl bg-indigo-500/10 flex items-center justify-center text-lg font-bold text-indigo-300 overflow-hidden">
+                    {selectedUser.avatar_url ? (
+                      <img src={selectedUser.avatar_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      selectedUser.display_name?.[0]?.toUpperCase()
+                    )}
+                  </div>
+                  {currentProfile?.role === 'owner' && (
+                    <>
+                      <button
+                        onClick={() => avatarInputRef.current?.click()}
+                        disabled={uploadingAvatar}
+                        className="absolute inset-0 rounded-xl bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+                      >
+                        {uploadingAvatar ? <Loader2 className="w-4 h-4 text-white animate-spin" /> : <Camera className="w-4 h-4 text-white" />}
+                      </button>
+                      <input
+                        ref={avatarInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files?.[0]) uploadUserAvatar(e.target.files[0]);
+                          e.target.value = '';
+                        }}
+                      />
+                    </>
+                  )}
                 </div>
-                <p className="font-semibold text-sm">{selectedUser.display_name}</p>
-                <p className="text-[13px] text-zinc-500">@{selectedUser.username}</p>
+                {!editingUser ? (
+                  <>
+                    <p className="font-semibold text-sm">{selectedUser.display_name}</p>
+                    <p className="text-[13px] text-zinc-500">@{selectedUser.username}</p>
+                  </>
+                ) : (
+                  <p className="text-[10px] text-indigo-400 font-medium">Editing mode</p>
+                )}
               </div>
+
+              {/* Edit User Form (Owner only) */}
+              {editingUser && currentProfile?.role === 'owner' && (
+                <div className="mb-3 p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/10">
+                  <h4 className="text-[12px] font-semibold mb-2 text-indigo-300">Edit Profile</h4>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-[10px] text-zinc-500 mb-0.5">Display Name</label>
+                      <input value={editForm.display_name} onChange={e => setEditForm(f => ({ ...f, display_name: e.target.value }))} className="input-dark pl-2.5 text-[12px] py-1.5" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-zinc-500 mb-0.5">Username</label>
+                      <input value={editForm.username} onChange={e => setEditForm(f => ({ ...f, username: e.target.value.toLowerCase() }))} className="input-dark pl-2.5 text-[12px] py-1.5" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-zinc-500 mb-0.5">Bio</label>
+                      <textarea value={editForm.bio} onChange={e => setEditForm(f => ({ ...f, bio: e.target.value }))} className="input-dark pl-2.5 text-[12px] py-1.5 min-h-[50px] resize-y" />
+                    </div>
+                    <div className="flex space-x-1.5">
+                      <button onClick={saveUserEdit} disabled={editSaving} className="flex-1 flex items-center justify-center space-x-1 px-2 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white text-[11px] font-medium transition-colors disabled:opacity-50">
+                        {editSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                        <span>Save</span>
+                      </button>
+                      <button onClick={() => setEditingUser(false)} className="px-2 py-1.5 rounded-lg border border-white/[0.06] hover:bg-white/[0.04] text-[11px] transition-colors">Cancel</button>
+                    </div>
+                  </div>
+
+                  {/* Password Reset */}
+                  <div className="mt-3 pt-3 border-t border-white/[0.06]">
+                    <label className="block text-[10px] text-zinc-500 mb-0.5">Reset Password</label>
+                    <div className="flex space-x-1.5">
+                      <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="New password..." className="input-dark pl-2.5 text-[12px] py-1.5 flex-1" />
+                      <button onClick={resetUserPassword} disabled={savingPassword || !newPassword} className="px-2 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-[11px] font-medium transition-colors disabled:opacity-30">
+                        {savingPassword ? <Loader2 className="w-3 h-3 animate-spin" /> : <Lock className="w-3 h-3" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Role Management */}
               <div className="mb-3">
@@ -1105,6 +1285,21 @@ function AgentsTab({ supabase }) {
     fetchAgents();
   };
 
+  const duplicateAgent = async (agent) => {
+    const { id, created_at, updated_at, ...agentData } = agent;
+    const { error } = await supabase.from('ai_agents').insert({
+      ...agentData,
+      name: `${agent.name} (Copy)`,
+      is_active: false,
+    });
+    if (!error) {
+      toast.success(`Duplicated "${agent.name}"`);
+      fetchAgents();
+    } else {
+      toast.error('Failed to duplicate agent');
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -1225,6 +1420,9 @@ function AgentsTab({ supabase }) {
                 </button>
                 <button onClick={() => startEdit(agent)} className="p-1 rounded-md hover:bg-white/[0.04]">
                   <Edit3 className="w-3.5 h-3.5 text-zinc-400" />
+                </button>
+                <button onClick={() => duplicateAgent(agent)} className="p-1 rounded-md hover:bg-indigo-500/10" title="Duplicate agent">
+                  <Copy className="w-3.5 h-3.5 text-indigo-400" />
                 </button>
                 <button onClick={() => deleteAgent(agent.id)} className="p-1 rounded-md hover:bg-red-500/10">
                   <Trash2 className="w-3.5 h-3.5 text-red-400" />

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, Square, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export default function VoiceRecorder({ onTranscription, disabled }) {
   const [recording, setRecording] = useState(false);
@@ -21,19 +22,25 @@ export default function VoiceRecorder({ onTranscription, disabled }) {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch {}
+        try { recognitionRef.current.abort(); } catch {}
       }
     };
   }, []);
 
   const startRecording = async () => {
-    // Try browser SpeechRecognition first (works without API key)
     if (useBrowserSpeech) {
-      startBrowserSpeech();
+      try {
+        startBrowserSpeech();
+      } catch (err) {
+        console.error('Browser speech failed, trying mic fallback:', err);
+        await startMicRecording();
+      }
       return;
     }
+    await startMicRecording();
+  };
 
-    // Fallback: record audio and send to API
+  const startMicRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
@@ -56,62 +63,89 @@ export default function VoiceRecorder({ onTranscription, disabled }) {
       timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
     } catch (err) {
       console.error('Microphone access denied:', err);
+      toast.error('Microphone access denied. Check browser permissions.');
     }
   };
 
   const startBrowserSpeech = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
+    if (!SpeechRecognition) {
+      toast.error('Speech recognition not supported in this browser');
+      return;
+    }
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = false;
+    recognition.continuous = false;
+    recognition.interimResults = true;
     recognition.lang = navigator.language || 'en-US';
+    recognition.maxAlternatives = 1;
 
     let finalTranscript = '';
+    let hasResult = false;
 
     recognition.onresult = (event) => {
+      hasResult = true;
+      let interim = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         if (event.results[i].isFinal) {
           finalTranscript += event.results[i][0].transcript + ' ';
+        } else {
+          interim += event.results[i][0].transcript;
         }
       }
     };
 
     recognition.onend = () => {
       setRecording(false);
-      clearInterval(timerRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
+      recognitionRef.current = null;
       if (finalTranscript.trim()) {
         onTranscription(finalTranscript.trim());
+        toast.success('Voice captured!');
+      } else if (!hasResult) {
+        toast.error('No speech detected. Try speaking louder or closer to the mic.');
       }
     };
 
     recognition.onerror = (event) => {
       console.error('Speech recognition error:', event.error);
       setRecording(false);
-      clearInterval(timerRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
+      recognitionRef.current = null;
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        toast.error('Microphone permission denied');
+      } else if (event.error === 'no-speech') {
+        toast.error('No speech detected. Try again.');
+      } else if (event.error !== 'aborted') {
+        toast.error(`Voice error: ${event.error}`);
+      }
     };
 
     recognitionRef.current = recognition;
-    recognition.start();
-    setRecording(true);
-    setDuration(0);
-    timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
+    try {
+      recognition.start();
+      setRecording(true);
+      setDuration(0);
+      timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
+      toast('Listening... Speak now', { icon: '🎙️', duration: 2000 });
+    } catch (err) {
+      console.error('Failed to start recognition:', err);
+      toast.error('Failed to start voice recognition');
+      recognitionRef.current = null;
+    }
   };
 
   const stopRecording = () => {
     if (recognitionRef.current && recording) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
-      setRecording(false);
-      clearInterval(timerRef.current);
+      try { recognitionRef.current.stop(); } catch {}
+      // onend handler will clean up state
       return;
     }
 
     if (mediaRecorderRef.current && recording) {
       mediaRecorderRef.current.stop();
       setRecording(false);
-      clearInterval(timerRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
     }
   };
 

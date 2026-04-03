@@ -55,21 +55,21 @@ export default function SupportPage() {
         table: 'ticket_messages',
         filter: `ticket_id=eq.${selectedTicket.id}`,
       }, (payload) => {
+        if (payload.new.is_admin) {
+          toast.custom((t) => (
+            <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} flex items-center space-x-3 px-5 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-500/90 to-purple-500/90 text-white shadow-2xl shadow-indigo-500/25 backdrop-blur-xl border border-white/20`}>
+              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+                <Ticket className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">Ticket Updated!</p>
+                <p className="text-xs text-white/70">New reply from support</p>
+              </div>
+            </div>
+          ), { duration: 3000 });
+        }
         setTicketMessages(prev => {
           if (prev.find(m => m.id === payload.new.id)) return prev;
-          if (payload.new.is_admin) {
-            toast.custom((t) => (
-              <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} flex items-center space-x-3 px-5 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-500/90 to-purple-500/90 text-white shadow-2xl shadow-indigo-500/25 backdrop-blur-xl border border-white/20`}>
-                <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-                  <Ticket className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold">Ticket Updated!</p>
-                  <p className="text-xs text-white/70">New reply from support</p>
-                </div>
-              </div>
-            ), { duration: 3000 });
-          }
           return [...prev, payload.new];
         });
       })

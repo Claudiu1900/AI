@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
   User, Lock, Palette, LogOut, Save, Eye, EyeOff,
-  Mail, AtSign, Shield, MessageSquare, Bot, Zap, Trash2
+  Mail, AtSign, Shield, MessageSquare, Bot, Zap, Trash2, Camera, Loader2
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -21,12 +21,16 @@ export default function SettingsPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
   const [stats, setStats] = useState({ conversations: 0, messages: 0, agents: 0 });
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef(null);
 
   useEffect(() => {
     if (profile) {
       setDisplayName(profile.display_name || '');
       setUsername(profile.username || '');
       setBio(profile.bio || '');
+      setAvatarUrl(profile.avatar_url || '');
     }
   }, [profile]);
 
@@ -97,6 +101,7 @@ export default function SettingsPage() {
         display_name: displayName,
         username: username.toLowerCase(),
         bio,
+        avatar_url: avatarUrl || null,
         updated_at: new Date().toISOString(),
       })
       .eq('user_id', user.id);
@@ -230,6 +235,70 @@ export default function SettingsPage() {
                 className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-5"
               >
                 <h2 className="text-sm font-semibold mb-4">Profile Settings</h2>
+
+                {/* Avatar Upload */}
+                <div className="flex items-center space-x-4 mb-5 p-4 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                  <div className="relative group">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-white/[0.08] flex items-center justify-center overflow-hidden">
+                      {avatarUrl ? (
+                        <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-2xl font-bold text-indigo-300">{displayName?.[0]?.toUpperCase() || '?'}</span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => avatarInputRef.current?.click()}
+                      disabled={uploadingAvatar}
+                      className="absolute inset-0 rounded-2xl bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+                    >
+                      {uploadingAvatar ? (
+                        <Loader2 className="w-5 h-5 text-white animate-spin" />
+                      ) : (
+                        <Camera className="w-5 h-5 text-white" />
+                      )}
+                    </button>
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (file.size > 2 * 1024 * 1024) {
+                          toast.error('Image must be under 2MB');
+                          return;
+                        }
+                        setUploadingAvatar(true);
+                        try {
+                          const ext = file.name.split('.').pop();
+                          const fileName = `${user.id}-${Date.now()}.${ext}`;
+                          const { error: uploadError } = await supabase.storage
+                            .from('avatars')
+                            .upload(fileName, file, { upsert: true });
+                          if (uploadError) throw uploadError;
+                          const { data: { publicUrl } } = supabase.storage
+                            .from('avatars')
+                            .getPublicUrl(fileName);
+                          setAvatarUrl(publicUrl);
+                          await supabase.from('profiles').update({ avatar_url: publicUrl, updated_at: new Date().toISOString() }).eq('user_id', user.id);
+                          toast.success('Avatar updated!');
+                          fetchProfile(user.id);
+                        } catch (err) {
+                          console.error('Avatar upload error:', err);
+                          toast.error('Failed to upload avatar. Make sure the "avatars" storage bucket exists in Supabase.');
+                        }
+                        setUploadingAvatar(false);
+                        e.target.value = '';
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-medium">{displayName || 'Your Name'}</p>
+                    <p className="text-[11px] text-zinc-500">@{username || 'username'}</p>
+                    <p className="text-[10px] text-zinc-600 mt-1">Click photo to change · Max 2MB</p>
+                  </div>
+                </div>
 
                 <div className="space-y-4">
                   <div>
