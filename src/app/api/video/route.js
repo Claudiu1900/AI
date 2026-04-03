@@ -44,23 +44,23 @@ Example output: A thrilling high-speed car race through a neon-lit cityscape at 
 
 export async function POST(req) {
   try {
-    const { prompt, model } = await req.json();
-    const apiKey = process.env.VEO3_API_KEY;
+    const { prompt, model, api_key_env } = await req.json();
+    const envVar = api_key_env || 'VEO3_API_KEY';
+    const apiKey = process.env[envVar];
 
     if (!prompt) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
     }
 
     if (!apiKey || apiKey.includes('your_')) {
-      return NextResponse.json({ error: 'VEO3 API key not configured' }, { status: 500 });
+      return NextResponse.json({ error: `API key not configured (env: ${envVar})` }, { status: 500 });
     }
 
     // Enhance prompt
     const enhancedPrompt = await enhanceVideoPrompt(prompt);
     console.log('Video enhanced prompt:', enhancedPrompt);
 
-    // Use model from agent config: "veo3" (high quality) or "veo3-fast" (fast)
-    const veoModel = model || 'veo3-fast';
+    const veoModel = model || 'veo-3.1';
 
     // Step 1: Start video generation
     const generateRes = await fetch(`${VEO_API_BASE}/generate`, {

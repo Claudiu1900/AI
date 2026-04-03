@@ -339,7 +339,7 @@ export default function ChatPage() {
         const res = await fetch('/api/video', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: messageContent, model: agent.model }),
+          body: JSON.stringify({ prompt: messageContent, model: agent.model, api_key_env: agent.api_key_env }),
         });
         const data = await res.json();
 
