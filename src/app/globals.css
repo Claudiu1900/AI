@@ -2,7 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
+/* ============================
+   THEME SYSTEM
+   ============================ */
+:root,
+[data-theme="dark-indigo"] {
   --bg-primary: #09090b;
   --bg-secondary: #0c0c14;
   --bg-tertiary: #13131d;
@@ -16,6 +20,50 @@
   --border: rgba(255, 255, 255, 0.06);
   --border-hover: rgba(255, 255, 255, 0.12);
   --radius: 14px;
+}
+
+/* Dark Purple Theme */
+[data-theme="dark-purple"] {
+  --bg-primary: #0a0912;
+  --bg-secondary: #110e1e;
+  --bg-tertiary: #1a1530;
+  --bg-elevated: #221c3d;
+  --accent: #8b5cf6;
+  --accent-light: #a78bfa;
+  --accent-glow: rgba(139, 92, 246, 0.15);
+}
+
+/* Dark Emerald Theme */
+[data-theme="dark-emerald"] {
+  --bg-primary: #080f0d;
+  --bg-secondary: #0b1512;
+  --bg-tertiary: #0f1f1a;
+  --bg-elevated: #142b24;
+  --accent: #10b981;
+  --accent-light: #34d399;
+  --accent-glow: rgba(16, 185, 129, 0.15);
+}
+
+/* Dark Rose Theme */
+[data-theme="dark-rose"] {
+  --bg-primary: #0f0809;
+  --bg-secondary: #150b0e;
+  --bg-tertiary: #201015;
+  --bg-elevated: #2d151d;
+  --accent: #f43f5e;
+  --accent-light: #fb7185;
+  --accent-glow: rgba(244, 63, 94, 0.15);
+}
+
+/* Midnight Blue Theme */
+[data-theme="dark-ocean"] {
+  --bg-primary: #080c12;
+  --bg-secondary: #0b1120;
+  --bg-tertiary: #0f1a30;
+  --bg-elevated: #142340;
+  --accent: #3b82f6;
+  --accent-light: #60a5fa;
+  --accent-glow: rgba(59, 130, 246, 0.15);
 }
 
 * {
@@ -349,3 +397,148 @@ body {
 /* Prose overrides for dark theme */
 .prose-invert a { color: var(--accent-light); }
 .prose-invert strong { color: var(--text-primary); }
+
+/* ============================
+   FUTURISTIC ENHANCEMENTS
+   ============================ */
+
+/* Glow effects */
+.glow-sm {
+  box-shadow: 0 0 15px var(--accent-glow), 0 0 30px rgba(99, 102, 241, 0.05);
+}
+
+.glow-md {
+  box-shadow: 0 0 25px var(--accent-glow), 0 0 60px rgba(99, 102, 241, 0.08);
+}
+
+.glow-lg {
+  box-shadow: 0 0 40px var(--accent-glow), 0 0 100px rgba(99, 102, 241, 0.1);
+}
+
+/* Glass variants */
+.glass-ultra {
+  background: rgba(9, 9, 11, 0.6);
+  backdrop-filter: blur(60px) saturate(1.5);
+  -webkit-backdrop-filter: blur(60px) saturate(1.5);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.glass-frosted {
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(40px) saturate(1.2);
+  -webkit-backdrop-filter: blur(40px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius);
+}
+
+.glass-frosted:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Gradient animations */
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradientShift 4s ease infinite;
+}
+
+/* Breathing glow */
+@keyframes breathe {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.02); }
+}
+
+.animate-breathe {
+  animation: breathe 4s ease-in-out infinite;
+}
+
+/* Slide up animation */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Scale in animation */
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Noise texture overlay */
+.noise-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.02;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.5'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Focus ring utility */
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--accent);
+}
+
+/* Smooth transitions for theme switching */
+body, .glass, .glass-strong, .glass-card, .glass-ultra, .glass-frosted,
+.btn-primary, .btn-secondary, .input-dark, .sidebar-item {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+/* Touch feedback for mobile */
+@media (hover: none) {
+  .sidebar-item:active {
+    background: rgba(255, 255, 255, 0.06);
+    transform: scale(0.98);
+  }
+  
+  .btn-primary:active {
+    transform: scale(0.97);
+  }
+}
+
+/* Disable text selection on UI elements */
+button, nav, .sidebar-item {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Scrollbar for mobile */
+@media (max-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 3px;
+    height: 3px;
+  }
+}
+
+/* Print styles */
+@media print {
+  .glass, .glass-strong { background: white; color: black; }
+  nav, aside { display: none !important; }
+}

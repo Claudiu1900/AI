@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, Square, Send, Loader2 } from 'lucide-react';
+import { Mic, Square, Loader2 } from 'lucide-react';
 
 export default function VoiceRecorder({ onTranscription, disabled }) {
   const [recording, setRecording] = useState(false);
@@ -11,14 +11,29 @@ export default function VoiceRecorder({ onTranscription, disabled }) {
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const [useBrowserSpeech] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  });
 
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch {}
+      }
     };
   }, []);
 
   const startRecording = async () => {
+    // Try browser SpeechRecognition first (works without API key)
+    if (useBrowserSpeech) {
+      startBrowserSpeech();
+      return;
+    }
+
+    // Fallback: record audio and send to API
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
@@ -44,7 +59,55 @@ export default function VoiceRecorder({ onTranscription, disabled }) {
     }
   };
 
+  const startBrowserSpeech = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = navigator.language || 'en-US';
+
+    let finalTranscript = '';
+
+    recognition.onresult = (event) => {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript + ' ';
+        }
+      }
+    };
+
+    recognition.onend = () => {
+      setRecording(false);
+      clearInterval(timerRef.current);
+      if (finalTranscript.trim()) {
+        onTranscription(finalTranscript.trim());
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+      setRecording(false);
+      clearInterval(timerRef.current);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setRecording(true);
+    setDuration(0);
+    timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
+  };
+
   const stopRecording = () => {
+    if (recognitionRef.current && recording) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+      setRecording(false);
+      clearInterval(timerRef.current);
+      return;
+    }
+
     if (mediaRecorderRef.current && recording) {
       mediaRecorderRef.current.stop();
       setRecording(false);
@@ -66,6 +129,8 @@ export default function VoiceRecorder({ onTranscription, disabled }) {
       const data = await res.json();
       if (data.text) {
         onTranscription(data.text);
+      } else if (data.error) {
+        console.error('Transcription error:', data.error);
       }
     } catch (err) {
       console.error('Transcription failed:', err);
@@ -88,10 +153,10 @@ export default function VoiceRecorder({ onTranscription, disabled }) {
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
-            className="flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20"
+            className="flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20"
           >
-            <Loader2 className="w-4 h-4 text-cyan-400 animate-spin" />
-            <span className="text-xs text-cyan-400">Transcribing...</span>
+            <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />
+            <span className="text-xs text-indigo-400">Transcribing...</span>
           </motion.div>
         ) : recording ? (
           <motion.div
@@ -124,7 +189,7 @@ export default function VoiceRecorder({ onTranscription, disabled }) {
             whileTap={{ scale: 0.9 }}
             onClick={startRecording}
             disabled={disabled}
-            className="p-2 rounded-xl hover:bg-white/5 text-gray-400 hover:text-cyan-400 transition-all disabled:opacity-30"
+            className="p-2 rounded-xl hover:bg-white/5 text-zinc-400 hover:text-indigo-400 transition-all disabled:opacity-30"
             title="Record voice message"
           >
             <Mic className="w-5 h-5" />

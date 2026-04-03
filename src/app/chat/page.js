@@ -5,11 +5,13 @@ import { useAuth } from '@/components/AuthProvider';
 import { motion, AnimatePresence } from 'framer-motion';
 import ChatMessage from '@/components/ChatMessage';
 import VoiceRecorder from '@/components/VoiceRecorder';
+import Image from 'next/image';
 import toast from 'react-hot-toast';
 import {
-  Plus, Send, Image as ImageIcon, Trash2, Pin, Archive,
+  Plus, Send, Image as ImageIcon, Trash2,
   MessageSquare, Search, ChevronDown, Bot, Loader2,
-  PanelLeftClose, PanelLeftOpen, Sparkles, X
+  PanelLeftClose, PanelLeftOpen, Sparkles, X,
+  Download, Share2, Copy, Check
 } from 'lucide-react';
 
 export default function ChatPage() {
@@ -18,7 +20,7 @@ export default function ChatPage() {
   const [currentConv, setCurrentConv] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [convsLoading, setConvsLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [agents, setAgents] = useState([]);
   const [selectedAgent, setSelectedAgent] = useState(null);
@@ -27,6 +29,7 @@ export default function ChatPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [shareLink, setShareLink] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -66,7 +69,7 @@ export default function ChatPage() {
   useEffect(() => {
     if (!user || authLoading) return;
     const fetchConversations = async () => {
-      setLoading(true);
+      setConvsLoading(true);
       try {
         const { data } = await supabase
           .from('conversations')
@@ -77,7 +80,7 @@ export default function ChatPage() {
       } catch (err) {
         console.error('Failed to fetch conversations:', err);
       } finally {
-        setLoading(false);
+        setConvsLoading(false);
       }
     };
     fetchConversations();
@@ -189,6 +192,42 @@ export default function ChatPage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // Download conversation as text
+  const downloadConversation = () => {
+    if (!currentConv || messages.length === 0) return;
+    const text = messages.map(m => {
+      const role = m.role === 'user' ? 'You' : (selectedAgent?.name || 'AI');
+      const time = m.created_at ? new Date(m.created_at).toLocaleString() : '';
+      return `[${time}] ${role}:\n${m.content}\n`;
+    }).join('\n---\n\n');
+    const header = `# ${currentConv.title}\n# Exported from ToxiQ AI\n# ${new Date().toLocaleString()}\n\n`;
+    const blob = new Blob([header + text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${currentConv.title?.replace(/[^a-z0-9]/gi, '_') || 'chat'}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Conversation downloaded');
+  };
+
+  // Copy conversation to clipboard (share)
+  const shareConversation = async () => {
+    if (!currentConv || messages.length === 0) return;
+    const text = messages.map(m => {
+      const role = m.role === 'user' ? 'You' : (selectedAgent?.name || 'AI');
+      return `${role}: ${m.content}`;
+    }).join('\n\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      setShareLink(true);
+      setTimeout(() => setShareLink(false), 2000);
+      toast.success('Conversation copied to clipboard');
+    } catch {
+      toast.error('Failed to copy');
+    }
+  };
+
   const sendMessage = async (e) => {
     e?.preventDefault();
     if ((!input.trim() && !imageFile) || sending) return;
@@ -259,6 +298,13 @@ export default function ChatPage() {
     const agent = selectedAgent || agents.find(a => a.id === conv.ai_agent_id);
     if (!agent) {
       toast.error('No AI model available');
+      setSending(false);
+      return;
+    }
+
+    // Check prompt limits (-1 means unlimited)
+    if (agent.allowed_prompts !== -1 && agent.used_prompts >= agent.allowed_prompts) {
+      toast.error('You have reached your prompt limit for this model');
       setSending(false);
       return;
     }
@@ -371,7 +417,19 @@ export default function ChatPage() {
   if (authLoading) {
     return (
       <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center">
-        <div className="w-6 h-6 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center space-y-3"
+        >
+          <div className="relative">
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center">
+              <Image src="/toxiqailogo.png" alt="Loading" width={24} height={24} className="rounded-md" />
+            </div>
+            <div className="absolute inset-0 rounded-xl border-2 border-indigo-500/20 border-t-indigo-500 animate-spin" />
+          </div>
+          <p className="text-xs text-zinc-500">Loading ToxiQ AI...</p>
+        </motion.div>
       </div>
     );
   }
@@ -433,7 +491,7 @@ export default function ChatPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-1.5 space-y-0.5">
-              {loading ? (
+              {convsLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <div key={i} className="h-12 rounded-lg shimmer" />
                 ))
@@ -502,9 +560,30 @@ export default function ChatPage() {
             </div>
           </div>
 
-          <div className="relative">
-            <button
-              onClick={() => setShowAgentPicker(!showAgentPicker)}
+          <div className="flex items-center space-x-1.5">
+            {/* Share & Download buttons */}
+            {currentConv && messages.length > 0 && (
+              <>
+                <button
+                  onClick={shareConversation}
+                  className="p-1.5 rounded-lg hover:bg-white/[0.04] text-zinc-500 hover:text-indigo-400 transition-colors"
+                  title="Copy conversation"
+                >
+                  {shareLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
+                </button>
+                <button
+                  onClick={downloadConversation}
+                  className="p-1.5 rounded-lg hover:bg-white/[0.04] text-zinc-500 hover:text-indigo-400 transition-colors"
+                  title="Download conversation"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
+
+            <div className="relative">
+              <button
+                onClick={() => setShowAgentPicker(!showAgentPicker)}
               className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg border border-white/[0.06] hover:bg-white/[0.04] transition-colors text-[13px]"
             >
               <Bot className="w-3.5 h-3.5 text-indigo-400" />
@@ -542,9 +621,9 @@ export default function ChatPage() {
                         <div className="text-left flex-1 min-w-0">
                           <p className="text-[13px] font-medium">{agent.name}</p>
                           <p className="text-[11px] text-zinc-500 truncate">{agent.description}</p>
-                          <p className="text-[10px] text-indigo-400 mt-0.5">
-                            {agent.used_prompts}/{agent.allowed_prompts} prompts
-                          </p>
+                            <p className="text-[10px] text-indigo-400 mt-0.5">
+                              {agent.allowed_prompts === -1 ? '∞' : `${agent.used_prompts}/${agent.allowed_prompts}`} prompts
+                            </p>
                         </div>
                       </button>
                     ))
@@ -552,6 +631,7 @@ export default function ChatPage() {
                 </motion.div>
               )}
             </AnimatePresence>
+          </div>
           </div>
         </div>
 

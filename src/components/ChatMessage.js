@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm';
 import CodeBlock from './CodeBlock';
 import { motion } from 'framer-motion';
 import { Bot, User, Copy, Check, Image as ImageIcon } from 'lucide-react';
+import NextImage from 'next/image';
 import { useState } from 'react';
 import { format } from 'date-fns';
 
@@ -35,7 +36,7 @@ export default function ChatMessage({ message, agentName, agentImage }) {
         {isUser ? (
           <User className="w-3.5 h-3.5 text-white" />
         ) : (
-          <Bot className="w-3.5 h-3.5 text-indigo-400" />
+          <NextImage src="/toxiqailogo.png" alt="AI" width={18} height={18} className="rounded-sm" />
         )}
       </div>
 

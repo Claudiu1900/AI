@@ -150,6 +150,7 @@ export default function SettingsPage() {
 
   const settingsTabs = [
     { id: 'profile', label: 'Profile', icon: User },
+    { id: 'appearance', label: 'Theme', icon: Palette },
     { id: 'security', label: 'Security', icon: Lock },
     { id: 'account', label: 'Account', icon: Shield },
   ];
@@ -292,6 +293,51 @@ export default function SettingsPage() {
                     )}
                     <span>Save Changes</span>
                   </button>
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'appearance' && (
+              <motion.div
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.15 }}
+                className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-5"
+              >
+                <h2 className="text-sm font-semibold mb-4">Theme</h2>
+                <p className="text-[13px] text-zinc-400 mb-4">Choose your preferred color theme</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {[
+                    { id: 'dark-indigo', name: 'Indigo', colors: ['#6366f1', '#818cf8', '#09090b'] },
+                    { id: 'dark-purple', name: 'Purple', colors: ['#8b5cf6', '#a78bfa', '#0a0912'] },
+                    { id: 'dark-emerald', name: 'Emerald', colors: ['#10b981', '#34d399', '#080f0d'] },
+                    { id: 'dark-rose', name: 'Rose', colors: ['#f43f5e', '#fb7185', '#0f0809'] },
+                    { id: 'dark-ocean', name: 'Ocean', colors: ['#3b82f6', '#60a5fa', '#080c12'] },
+                  ].map(theme => {
+                    const currentTheme = typeof window !== 'undefined' ? document.documentElement.getAttribute('data-theme') || 'dark-indigo' : 'dark-indigo';
+                    const isActive = currentTheme === theme.id;
+                    return (
+                      <button
+                        key={theme.id}
+                        onClick={() => {
+                          document.documentElement.setAttribute('data-theme', theme.id);
+                          localStorage.setItem('toxiq-theme', theme.id);
+                        }}
+                        className={`flex flex-col items-center p-4 rounded-xl border transition-all ${
+                          isActive
+                            ? 'border-white/20 bg-white/[0.06]'
+                            : 'border-white/[0.05] bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/[0.08]'
+                        }`}
+                      >
+                        <div className="flex space-x-1 mb-2">
+                          {theme.colors.map((c, i) => (
+                            <div key={i} className="w-5 h-5 rounded-full border border-white/10" style={{ backgroundColor: c }} />
+                          ))}
+                        </div>
+                        <span className="text-[12px] font-medium">{theme.name}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </motion.div>
             )}

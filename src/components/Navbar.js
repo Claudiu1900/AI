@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect, useRef } from 'react';
 import {
   MessageSquare, Settings, Shield, Home, LogOut, Menu, X,
-  User, ChevronDown, Sparkles
+  User, ChevronDown, Sparkles, HelpCircle, LifeBuoy
 } from 'lucide-react';
 
 export default function Navbar() {
@@ -22,8 +22,12 @@ export default function Navbar() {
     { href: '/', label: 'Home', icon: Home },
     ...(user ? [
       { href: '/chat', label: 'Chat', icon: MessageSquare },
+      { href: '/faq', label: 'FAQ', icon: HelpCircle },
+      { href: '/support', label: 'Support', icon: LifeBuoy },
       { href: '/settings', label: 'Settings', icon: Settings },
-    ] : []),
+    ] : [
+      { href: '/faq', label: 'FAQ', icon: HelpCircle },
+    ]),
     ...(profile?.is_admin || profile?.role === 'owner' ? [
       { href: '/admin', label: 'Admin', icon: Shield },
     ] : []),

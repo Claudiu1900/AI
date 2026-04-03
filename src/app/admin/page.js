@@ -474,9 +474,12 @@ function UsersTab({ supabase, currentUser, currentProfile }) {
                             defaultValue={access.allowed_prompts}
                             onBlur={(e) => updatePromptLimit(access.id, e.target.value)}
                             className="w-16 px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/[0.06] text-[11px] text-center"
-                            min="0"
+                            min="-1"
+                            title="-1 = unlimited"
                           />
-                          <span className="text-[10px] text-zinc-500">prompts ({access.used_prompts} used)</span>
+                          <span className="text-[10px] text-zinc-500">
+                            {access.allowed_prompts === -1 ? '∞' : 'prompts'} ({access.used_prompts} used)
+                          </span>
                         </div>
                       </div>
                       <button
@@ -644,6 +647,7 @@ function AgentsTab({ supabase }) {
                 <label className="block text-xs text-gray-400 mb-1">API Type</label>
                 <select value={form.api_type} onChange={e => setForm({...form, api_type: e.target.value})} className="input-dark pl-3.5 text-sm">
                   <option value="openai">OpenAI</option>
+                  <option value="openrouter">OpenRouter</option>
                   <option value="gemini">Google Gemini</option>
                   <option value="custom">Custom</option>
                 </select>

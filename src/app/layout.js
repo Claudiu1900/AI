@@ -13,6 +13,13 @@ export const metadata = {
   },
 };
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
@@ -20,12 +27,18 @@ export default function RootLayout({ children }) {
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+        <script dangerouslySetInnerHTML={{ __html: `
+          try {
+            const t = localStorage.getItem('toxiq-theme');
+            if (t) document.documentElement.setAttribute('data-theme', t);
+          } catch(e) {}
+        `}} />
       </head>
       <body className="min-h-screen antialiased">
         <AuthProvider>
           <AnimatedBackground />
           <Navbar />
-          <main className="relative z-10 pt-16">
+          <main className="relative z-10 pt-14">
             {children}
           </main>
           <Toaster
