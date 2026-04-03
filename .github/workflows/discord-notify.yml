@@ -1,0 +1,68 @@
+name: Discord Commit Notify
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Discord Notification
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          REPO_NAME="${{ github.repository }}"
+          BRANCH="${{ github.ref_name }}"
+          AUTHOR="${{ github.actor }}"
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          COMMIT_MSG=$(echo '${{ github.event.head_commit.message }}' | head -1)
+          COMMIT_URL="https://github.com/${REPO_NAME}/commit/${COMMIT_SHA}"
+          COMPARE_URL="${{ github.event.compare }}"
+          COMMIT_COUNT="${{ github.event.commits.length }}"
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          # Build commits list
+          COMMITS_TEXT=""
+          for row in $(echo '${{ toJSON(github.event.commits) }}' | jq -r '.[] | @base64'); do
+            _jq() { echo "${row}" | base64 --decode | jq -r "${1}"; }
+            MSG=$(_jq '.message' | head -1)
+            SHA=$(_jq '.id' | cut -c1-7)
+            URL="https://github.com/${REPO_NAME}/commit/$(_jq '.id')"
+            COMMITS_TEXT="${COMMITS_TEXT}[\`${SHA}\`](${URL}) ${MSG}\n"
+          done
+
+          # Send embed to Discord
+          curl -s -H "Content-Type: application/json" \
+            -X POST "${DISCORD_WEBHOOK}" \
+            -d @- <<EOF
+          {
+            "embeds": [{
+              "title": "🚀 New push to ${REPO_NAME}",
+              "url": "${COMPARE_URL}",
+              "color": 6366961,
+              "fields": [
+                {
+                  "name": "Branch",
+                  "value": "\`${BRANCH}\`",
+                  "inline": true
+                },
+                {
+                  "name": "Author",
+                  "value": "${AUTHOR}",
+                  "inline": true
+                },
+                {
+                  "name": "Commits",
+                  "value": "${COMMITS_TEXT}",
+                  "inline": false
+                }
+              ],
+              "timestamp": "${TIMESTAMP}",
+              "footer": {
+                "text": "ToxiQ AI • GitHub Actions"
+              }
+            }]
+          }
+          EOF
