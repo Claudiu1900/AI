@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { InferenceClient } from '@huggingface/inference';
 
 // Use Qwen via OpenRouter to enhance the user's prompt into a detailed English image prompt
 async function enhancePrompt(userPrompt) {
@@ -69,47 +70,24 @@ export async function POST(req) {
       return NextResponse.json({ url });
     }
 
-    // HuggingFace FLUX.1-dev via HF Inference API
+    // HuggingFace FLUX.1-dev via HF Inference SDK
     if (api_type === 'huggingface' && process.env.HF_TOKEN && !process.env.HF_TOKEN.includes('your_')) {
       const enhancedPrompt = await enhancePrompt(prompt);
       console.log('HF Enhanced prompt:', enhancedPrompt);
 
       const hfModel = model || 'black-forest-labs/FLUX.1-dev';
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 120000);
+      const client = new InferenceClient(process.env.HF_TOKEN);
 
-      try {
-        const hfResponse = await fetch(`https://api-inference.huggingface.co/models/${hfModel}`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.HF_TOKEN}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            inputs: enhancedPrompt,
-          }),
-          signal: controller.signal,
-        });
+      const imageBlob = await client.textToImage({
+        model: hfModel,
+        inputs: enhancedPrompt,
+      });
 
-        clearTimeout(timeout);
+      const buffer = Buffer.from(await imageBlob.arrayBuffer());
+      const base64 = buffer.toString('base64');
+      const dataUrl = `data:image/png;base64,${base64}`;
 
-        if (!hfResponse.ok) {
-          const errText = await hfResponse.text();
-          console.error('HF API error:', hfResponse.status, errText);
-          throw new Error(`HuggingFace API error: ${hfResponse.status}`);
-        }
-
-        // HF Inference API returns raw image bytes
-        const imageBuffer = await hfResponse.arrayBuffer();
-        const base64 = Buffer.from(imageBuffer).toString('base64');
-        const contentType = hfResponse.headers.get('content-type') || 'image/png';
-        const dataUrl = `data:${contentType};base64,${base64}`;
-
-        return NextResponse.json({ url: dataUrl });
-      } catch (err) {
-        clearTimeout(timeout);
-        throw err;
-      }
+      return NextResponse.json({ url: dataUrl });
     }
 
     // Step 1: Enhance prompt using AI (translate + add detail)
