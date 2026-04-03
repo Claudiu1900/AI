@@ -1240,20 +1240,25 @@ function AgentsTab({ supabase }) {
       return;
     }
 
+    let hasError = false;
     if (editing) {
       const { error } = await supabase.from('ai_agents').update(form).eq('id', editing);
-      if (!error) { toast.success('Agent updated'); setEditing(null); }
+      if (error) { toast.error('Failed to update agent: ' + error.message); hasError = true; }
+      else { toast.success('Agent updated'); setEditing(null); }
     } else {
       const { error } = await supabase.from('ai_agents').insert(form);
-      if (!error) { toast.success('Agent created'); setShowNew(false); }
+      if (error) { toast.error('Failed to create agent: ' + error.message); hasError = true; }
+      else { toast.success('Agent created'); setShowNew(false); }
     }
 
-    setForm({
-      name: '', description: '', api_type: 'openai', model: '',
-      api_key_env: 'OPENAI_API_KEY', system_prompt: 'You are a helpful AI assistant.',
-      max_tokens: 4096, temperature: 0.7, supports_images: false,
-      supports_voice: false, supports_image_generation: false, image_url: '', is_default: false,
-    });
+    if (!hasError) {
+      setForm({
+        name: '', description: '', api_type: 'openai', model: '',
+        api_key_env: 'OPENAI_API_KEY', system_prompt: 'You are a helpful AI assistant.',
+        max_tokens: 4096, temperature: 0.7, supports_images: false,
+        supports_voice: false, supports_image_generation: false, image_url: '', is_default: false,
+      });
+    }
     fetchAgents();
   };
 
