@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,12 +11,15 @@ import {
   MessageSquare, Zap, Clock, Eye, EyeOff, Key,
   UserCheck, UserX, Image, Mic, Sparkles, Activity,
   Database, Globe, Lock, Unlock, RefreshCw, Download,
-  TrendingUp, Hash
+  TrendingUp, Hash, Ticket, Send, ArrowLeft, RotateCcw,
+  CheckCircle2, XCircle, AlertTriangle, Bug, HelpCircle,
+  Lightbulb, Filter
 } from 'lucide-react';
 
 const tabs = [
   { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
   { id: 'users', label: 'Users', icon: Users },
+  { id: 'tickets', label: 'Tickets', icon: Ticket },
   { id: 'agents', label: 'AI Agents', icon: Bot },
   { id: 'statistics', label: 'Statistics', icon: TrendingUp },
   { id: 'settings', label: 'Settings', icon: Settings },
@@ -94,6 +97,7 @@ export default function AdminPage() {
         <AnimatePresence mode="wait">
           {activeTab === 'dashboard' && <DashboardTab key="dashboard" supabase={supabase} />}
           {activeTab === 'users' && <UsersTab key="users" supabase={supabase} currentUser={user} currentProfile={profile} />}
+          {activeTab === 'tickets' && <TicketsTab key="tickets" supabase={supabase} currentUser={user} />}
           {activeTab === 'agents' && <AgentsTab key="agents" supabase={supabase} />}
           {activeTab === 'statistics' && <StatisticsTab key="statistics" supabase={supabase} />}
           {activeTab === 'settings' && <SettingsTab key="settings" supabase={supabase} />}
@@ -114,6 +118,7 @@ function DashboardTab({ supabase }) {
     totalAgents: 0,
     activeUsers: 0,
     todayMessages: 0,
+    openTickets: 0,
   });
   const [recentActivity, setRecentActivity] = useState([]);
 
@@ -126,20 +131,22 @@ function DashboardTab({ supabase }) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const [users, convs, msgs, agents, todayMsgs] = await Promise.all([
+    const results = await Promise.allSettled([
       supabase.from('profiles').select('id', { count: 'exact', head: true }),
       supabase.from('conversations').select('id', { count: 'exact', head: true }),
       supabase.from('messages').select('id', { count: 'exact', head: true }),
       supabase.from('ai_agents').select('id', { count: 'exact', head: true }),
       supabase.from('messages').select('id', { count: 'exact', head: true }).gte('created_at', today.toISOString()),
+      supabase.from('tickets').select('id', { count: 'exact', head: true }).eq('status', 'open'),
     ]);
 
     setStats({
-      totalUsers: users.count || 0,
-      totalConversations: convs.count || 0,
-      totalMessages: msgs.count || 0,
-      totalAgents: agents.count || 0,
-      todayMessages: todayMsgs.count || 0,
+      totalUsers: results[0].status === 'fulfilled' ? (results[0].value.count || 0) : 0,
+      totalConversations: results[1].status === 'fulfilled' ? (results[1].value.count || 0) : 0,
+      totalMessages: results[2].status === 'fulfilled' ? (results[2].value.count || 0) : 0,
+      totalAgents: results[3].status === 'fulfilled' ? (results[3].value.count || 0) : 0,
+      todayMessages: results[4].status === 'fulfilled' ? (results[4].value.count || 0) : 0,
+      openTickets: results[5].status === 'fulfilled' ? (results[5].value.count || 0) : 0,
     });
   };
 
@@ -158,6 +165,7 @@ function DashboardTab({ supabase }) {
     { label: 'Total Messages', value: stats.totalMessages, icon: Zap, color: 'bg-emerald-500/10 text-emerald-400' },
     { label: 'AI Agents', value: stats.totalAgents, icon: Bot, color: 'bg-amber-500/10 text-amber-400' },
     { label: 'Today\'s Messages', value: stats.todayMessages, icon: Clock, color: 'bg-cyan-500/10 text-cyan-400' },
+    { label: 'Open Tickets', value: stats.openTickets, icon: Ticket, color: 'bg-rose-500/10 text-rose-400' },
   ];
 
   return (
@@ -169,7 +177,7 @@ function DashboardTab({ supabase }) {
     >
       <h1 className="text-lg font-semibold mb-4">Dashboard</h1>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
         {statCards.map(card => {
           const Icon = card.icon;
           return (
@@ -208,6 +216,416 @@ function DashboardTab({ supabase }) {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+// ============================================
+// TICKETS TAB
+// ============================================
+const ticketCategories = [
+  { id: 'question', label: 'General Question', icon: HelpCircle, color: 'text-indigo-400 bg-indigo-500/10' },
+  { id: 'bug', label: 'Bug Report', icon: Bug, color: 'text-red-400 bg-red-500/10' },
+  { id: 'feature', label: 'Feature Request', icon: Lightbulb, color: 'text-amber-400 bg-amber-500/10' },
+  { id: 'issue', label: 'Technical Issue', icon: AlertTriangle, color: 'text-orange-400 bg-orange-500/10' },
+  { id: 'feedback', label: 'Feedback', icon: MessageSquare, color: 'text-emerald-400 bg-emerald-500/10' },
+];
+
+const ticketStatusConfig = {
+  open: { label: 'Open', icon: Clock, color: 'text-amber-400 bg-amber-500/10 border-amber-500/20' },
+  in_progress: { label: 'In Progress', icon: Clock, color: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20' },
+  resolved: { label: 'Resolved', icon: CheckCircle2, color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
+  closed: { label: 'Closed', icon: XCircle, color: 'text-zinc-400 bg-zinc-500/10 border-zinc-500/20' },
+};
+
+function TicketsTab({ supabase, currentUser }) {
+  const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('open');
+  const [selectedTicket, setSelectedTicket] = useState(null);
+  const [ticketMessages, setTicketMessages] = useState([]);
+  const [replyMessage, setReplyMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const [stats, setStats] = useState({ total: 0, open: 0, closed: 0, byCategory: {} });
+  const messagesEndRef = useRef(null);
+  const channelRef = useRef(null);
+
+  useEffect(() => {
+    fetchTickets();
+    fetchStats();
+    return () => {
+      if (channelRef.current) supabase.removeChannel(channelRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedTicket) return;
+    // Real-time subscription for new messages on selected ticket
+    if (channelRef.current) supabase.removeChannel(channelRef.current);
+    const channel = supabase
+      .channel(`admin-ticket-${selectedTicket.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'ticket_messages',
+        filter: `ticket_id=eq.${selectedTicket.id}`,
+      }, (payload) => {
+        setTicketMessages(prev => {
+          if (prev.find(m => m.id === payload.new.id)) return prev;
+          return [...prev, payload.new];
+        });
+      })
+      .subscribe();
+    channelRef.current = channel;
+    return () => {
+      supabase.removeChannel(channel);
+      channelRef.current = null;
+    };
+  }, [selectedTicket?.id]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [ticketMessages]);
+
+  const fetchStats = async () => {
+    const results = await Promise.allSettled([
+      supabase.from('tickets').select('id', { count: 'exact', head: true }),
+      supabase.from('tickets').select('id', { count: 'exact', head: true }).eq('status', 'open'),
+      supabase.from('tickets').select('id', { count: 'exact', head: true }).in('status', ['closed', 'resolved']),
+      supabase.from('tickets').select('category, status'),
+    ]);
+
+    const byCategory = {};
+    if (results[3].status === 'fulfilled' && results[3].value.data) {
+      results[3].value.data.forEach(t => {
+        if (!byCategory[t.category]) byCategory[t.category] = { total: 0, open: 0, closed: 0 };
+        byCategory[t.category].total++;
+        if (t.status === 'open' || t.status === 'in_progress') byCategory[t.category].open++;
+        else byCategory[t.category].closed++;
+      });
+    }
+
+    setStats({
+      total: results[0].status === 'fulfilled' ? (results[0].value.count || 0) : 0,
+      open: results[1].status === 'fulfilled' ? (results[1].value.count || 0) : 0,
+      closed: results[2].status === 'fulfilled' ? (results[2].value.count || 0) : 0,
+      byCategory,
+    });
+  };
+
+  const fetchTickets = async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from('tickets')
+      .select('*, profiles!tickets_user_id_fkey(display_name, username)')
+      .order('created_at', { ascending: false });
+    setTickets(data || []);
+    setLoading(false);
+  };
+
+  const fetchTicketMessages = async (ticketId) => {
+    const { data } = await supabase
+      .from('ticket_messages')
+      .select('*, profiles!ticket_messages_user_id_fkey(display_name, username)')
+      .eq('ticket_id', ticketId)
+      .order('created_at', { ascending: true });
+    setTicketMessages(data || []);
+  };
+
+  const openTicketDetail = (ticket) => {
+    setSelectedTicket(ticket);
+    fetchTicketMessages(ticket.id);
+  };
+
+  const sendReply = async () => {
+    if (!replyMessage.trim() || !selectedTicket) return;
+    setSending(true);
+    try {
+      const { data, error } = await supabase
+        .from('ticket_messages')
+        .insert({
+          ticket_id: selectedTicket.id,
+          user_id: currentUser.id,
+          message: replyMessage.trim(),
+          is_admin: true,
+        })
+        .select('*, profiles!ticket_messages_user_id_fkey(display_name, username)')
+        .single();
+
+      if (error) throw error;
+      setTicketMessages(prev => {
+        if (prev.find(m => m.id === data.id)) return prev;
+        return [...prev, data];
+      });
+      setReplyMessage('');
+
+      // Update ticket status to in_progress if it was open
+      if (selectedTicket.status === 'open') {
+        await supabase.from('tickets').update({ status: 'in_progress' }).eq('id', selectedTicket.id);
+        setSelectedTicket(prev => ({ ...prev, status: 'in_progress' }));
+        setTickets(prev => prev.map(t => t.id === selectedTicket.id ? { ...t, status: 'in_progress' } : t));
+      }
+    } catch {
+      toast.error('Failed to send reply');
+    }
+    setSending(false);
+  };
+
+  const updateTicketStatus = async (ticketId, newStatus) => {
+    const { error } = await supabase.from('tickets').update({ status: newStatus }).eq('id', ticketId);
+    if (!error) {
+      setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: newStatus } : t));
+      if (selectedTicket?.id === ticketId) setSelectedTicket(prev => ({ ...prev, status: newStatus }));
+      toast.success(`Ticket ${newStatus === 'closed' ? 'closed' : newStatus === 'open' ? 'reopened' : 'updated'}`);
+      fetchStats();
+    }
+  };
+
+  const deleteTicket = async (ticketId) => {
+    const { error } = await supabase.from('tickets').delete().eq('id', ticketId);
+    if (!error) {
+      setTickets(prev => prev.filter(t => t.id !== ticketId));
+      if (selectedTicket?.id === ticketId) {
+        setSelectedTicket(null);
+        setTicketMessages([]);
+      }
+      toast.success('Ticket deleted');
+      fetchStats();
+    }
+  };
+
+  const filteredTickets = tickets.filter(t => {
+    if (filter === 'open') return t.status === 'open' || t.status === 'in_progress';
+    if (filter === 'closed') return t.status === 'closed' || t.status === 'resolved';
+    return true;
+  });
+
+  // Ticket detail view
+  if (selectedTicket) {
+    const cat = ticketCategories.find(c => c.id === selectedTicket.category);
+    const CatIcon = cat?.icon || HelpCircle;
+    return (
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
+        <button onClick={() => { setSelectedTicket(null); setTicketMessages([]); }} className="flex items-center space-x-1 text-[13px] text-zinc-400 hover:text-zinc-200 mb-4">
+          <ArrowLeft className="w-3.5 h-3.5" /><span>Back to tickets</span>
+        </button>
+
+        {/* Ticket header */}
+        <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-5 mb-4">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start space-x-3 flex-1 min-w-0">
+              <div className={`w-10 h-10 rounded-lg ${cat?.color || 'text-zinc-400 bg-zinc-500/10'} flex items-center justify-center flex-shrink-0`}>
+                <CatIcon className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center space-x-2 mb-1">
+                  <span className="text-[11px] text-zinc-500 font-mono">#{selectedTicket.ticket_number || '—'}</span>
+                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-medium border ${ticketStatusConfig[selectedTicket.status]?.color || ''}`}>
+                    {ticketStatusConfig[selectedTicket.status]?.label || selectedTicket.status}
+                  </span>
+                  <span className={`text-[10px] font-medium capitalize ${selectedTicket.priority === 'urgent' ? 'text-red-400' : selectedTicket.priority === 'high' ? 'text-orange-400' : 'text-zinc-500'}`}>
+                    {selectedTicket.priority}
+                  </span>
+                </div>
+                <h2 className="text-sm font-semibold mb-1">{selectedTicket.subject}</h2>
+                <p className="text-[11px] text-zinc-500">
+                  by <span className="text-zinc-300">{selectedTicket.profiles?.display_name || 'Unknown'}</span>
+                  {' '}(@{selectedTicket.profiles?.username || '?'})
+                  {' · '}{new Date(selectedTicket.created_at).toLocaleString()}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-1 flex-shrink-0 ml-2">
+              {(selectedTicket.status === 'open' || selectedTicket.status === 'in_progress') && (
+                <button onClick={() => updateTicketStatus(selectedTicket.id, 'closed')} className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-zinc-500/10 hover:bg-zinc-500/20 text-zinc-300 text-[11px] font-medium transition-colors">
+                  <XCircle className="w-3 h-3" /><span>Close</span>
+                </button>
+              )}
+              {(selectedTicket.status === 'closed' || selectedTicket.status === 'resolved') && (
+                <button onClick={() => updateTicketStatus(selectedTicket.id, 'open')} className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-[11px] font-medium transition-colors">
+                  <RotateCcw className="w-3 h-3" /><span>Reopen</span>
+                </button>
+              )}
+              <button onClick={() => deleteTicket(selectedTicket.id)} className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[11px] font-medium transition-colors">
+                <Trash2 className="w-3 h-3" /><span>Delete</span>
+              </button>
+            </div>
+          </div>
+          <div className="mt-3 pt-3 border-t border-white/[0.04]">
+            <p className="text-[13px] text-zinc-300 leading-relaxed whitespace-pre-wrap">{selectedTicket.message}</p>
+          </div>
+        </div>
+
+        {/* Messages */}
+        <div className="space-y-2 mb-4 max-h-[45vh] overflow-y-auto pr-1">
+          {ticketMessages.map(msg => (
+            <div key={msg.id} className={`p-3.5 rounded-xl ${msg.is_admin ? 'bg-indigo-500/5 border border-indigo-500/10 ml-8' : 'bg-white/[0.03] border border-white/[0.05] mr-8'}`}>
+              <div className="flex items-center space-x-1.5 mb-1.5">
+                <div className={`w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-bold ${msg.is_admin ? 'bg-indigo-500/20 text-indigo-300' : 'bg-zinc-500/20 text-zinc-300'}`}>
+                  {(msg.profiles?.display_name || (msg.is_admin ? 'A' : 'U'))[0]?.toUpperCase()}
+                </div>
+                <span className={`text-[11px] font-medium ${msg.is_admin ? 'text-indigo-400' : 'text-zinc-300'}`}>
+                  {msg.profiles?.display_name || (msg.is_admin ? 'Admin' : 'User')}
+                </span>
+                {msg.is_admin && <span className="px-1 py-0.5 rounded bg-indigo-500/10 text-indigo-400 text-[8px] font-bold">STAFF</span>}
+                <span className="text-[10px] text-zinc-600">{new Date(msg.created_at).toLocaleString()}</span>
+              </div>
+              <p className="text-[13px] text-zinc-300 leading-relaxed whitespace-pre-wrap">{msg.message}</p>
+            </div>
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Reply box */}
+        <div className="flex space-x-2">
+          <textarea
+            value={replyMessage}
+            onChange={(e) => setReplyMessage(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(); } }}
+            placeholder="Write an admin reply..."
+            className="input-dark pl-3.5 text-[13px] flex-1 min-h-[60px] resize-y"
+          />
+          <button
+            onClick={sendReply}
+            disabled={!replyMessage.trim() || sending}
+            className="p-3 self-end rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white disabled:opacity-30 transition-colors"
+          >
+            {sending ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send className="w-4 h-4" />}
+          </button>
+        </div>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-lg font-semibold">Tickets</h1>
+        <button onClick={() => { fetchTickets(); fetchStats(); }} className="p-1.5 rounded-lg hover:bg-white/[0.04] transition-colors">
+          <RefreshCw className="w-4 h-4 text-zinc-400" />
+        </button>
+      </div>
+
+      {/* Stats overview */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-4">
+          <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center mb-2"><Ticket className="w-4 h-4" /></div>
+          <p className="text-xl font-bold">{stats.total}</p>
+          <p className="text-[11px] text-zinc-500">Total Tickets</p>
+        </div>
+        <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-4">
+          <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center mb-2"><Clock className="w-4 h-4" /></div>
+          <p className="text-xl font-bold">{stats.open}</p>
+          <p className="text-[11px] text-zinc-500">Open Tickets</p>
+        </div>
+        <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-4">
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center mb-2"><CheckCircle2 className="w-4 h-4" /></div>
+          <p className="text-xl font-bold">{stats.closed}</p>
+          <p className="text-[11px] text-zinc-500">Closed Tickets</p>
+        </div>
+      </div>
+
+      {/* Stats per category */}
+      {Object.keys(stats.byCategory).length > 0 && (
+        <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-4 mb-4">
+          <h3 className="text-[13px] font-semibold mb-3">By Category</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+            {ticketCategories.map(cat => {
+              const catStats = stats.byCategory[cat.id];
+              if (!catStats) return null;
+              const Icon = cat.icon;
+              return (
+                <div key={cat.id} className="flex items-center space-x-2 p-2.5 rounded-lg bg-white/[0.02]">
+                  <div className={`w-7 h-7 rounded-md ${cat.color} flex items-center justify-center flex-shrink-0`}>
+                    <Icon className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <p className="text-[12px] font-medium">{cat.label}</p>
+                    <p className="text-[10px] text-zinc-500">{catStats.total} total · {catStats.open} open · {catStats.closed} closed</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Filter */}
+      <div className="flex items-center space-x-1 mb-4">
+        <Filter className="w-3.5 h-3.5 text-zinc-500 mr-1" />
+        {['open', 'closed', 'all'].map(f => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors capitalize ${
+              filter === f ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20' : 'text-zinc-400 border border-white/[0.05] hover:bg-white/[0.04]'
+            }`}
+          >
+            {f} {f === 'open' ? `(${stats.open})` : f === 'closed' ? `(${stats.closed})` : `(${stats.total})`}
+          </button>
+        ))}
+      </div>
+
+      {/* Ticket list */}
+      <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl overflow-hidden">
+        {loading ? (
+          <div className="p-6 text-center"><div className="w-6 h-6 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mx-auto" /></div>
+        ) : filteredTickets.length === 0 ? (
+          <div className="p-8 text-center">
+            <Ticket className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
+            <p className="text-[13px] text-zinc-500">No {filter !== 'all' ? filter : ''} tickets</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-white/[0.04] max-h-[50vh] overflow-y-auto">
+            {filteredTickets.map(ticket => {
+              const cat = ticketCategories.find(c => c.id === ticket.category);
+              const CatIcon = cat?.icon || HelpCircle;
+              const statusCfg = ticketStatusConfig[ticket.status] || ticketStatusConfig.open;
+              return (
+                <div key={ticket.id} className="flex items-center p-3 hover:bg-white/[0.02] transition-colors group">
+                  <button onClick={() => openTicketDetail(ticket)} className="flex items-center flex-1 min-w-0 text-left space-x-3">
+                    <div className={`w-8 h-8 rounded-lg ${cat?.color || 'text-zinc-400 bg-zinc-500/10'} flex items-center justify-center flex-shrink-0`}>
+                      <CatIcon className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2 mb-0.5">
+                        <span className="text-[10px] text-zinc-600 font-mono">#{ticket.ticket_number || '—'}</span>
+                        <p className="text-[13px] font-medium truncate">{ticket.subject}</p>
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-medium border flex-shrink-0 ${statusCfg.color}`}>
+                          {statusCfg.label}
+                        </span>
+                        {ticket.priority !== 'normal' && (
+                          <span className={`text-[9px] font-bold uppercase ${ticket.priority === 'urgent' ? 'text-red-400' : ticket.priority === 'high' ? 'text-orange-400' : 'text-zinc-500'}`}>
+                            {ticket.priority}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-zinc-500">
+                        {ticket.profiles?.display_name || 'Unknown'} · @{ticket.profiles?.username || '?'} · {new Date(ticket.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </button>
+                  <div className="flex items-center space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-2">
+                    {(ticket.status === 'open' || ticket.status === 'in_progress') && (
+                      <button onClick={() => updateTicketStatus(ticket.id, 'closed')} className="p-1.5 rounded-md hover:bg-zinc-500/10" title="Close">
+                        <XCircle className="w-3.5 h-3.5 text-zinc-400" />
+                      </button>
+                    )}
+                    {(ticket.status === 'closed' || ticket.status === 'resolved') && (
+                      <button onClick={() => updateTicketStatus(ticket.id, 'open')} className="p-1.5 rounded-md hover:bg-amber-500/10" title="Reopen">
+                        <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+                      </button>
+                    )}
+                    <button onClick={() => deleteTicket(ticket.id)} className="p-1.5 rounded-md hover:bg-red-500/10" title="Delete">
+                      <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

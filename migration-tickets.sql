@@ -4,6 +4,7 @@
 -- Tickets table
 CREATE TABLE IF NOT EXISTS public.tickets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ticket_number SERIAL UNIQUE,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   category TEXT NOT NULL DEFAULT 'question',
   subject TEXT NOT NULL,
@@ -100,3 +101,46 @@ DO $$ BEGIN
       FOR EACH ROW EXECUTE FUNCTION update_ticket_timestamp();
   END IF;
 END $$;
+
+-- If ticket_number column doesn't exist yet (table already created before this update)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'tickets' AND column_name = 'ticket_number') THEN
+    CREATE SEQUENCE IF NOT EXISTS tickets_ticket_number_seq;
+    ALTER TABLE public.tickets ADD COLUMN ticket_number INTEGER UNIQUE DEFAULT nextval('tickets_ticket_number_seq');
+    -- Backfill existing tickets
+    WITH numbered AS (
+      SELECT id, ROW_NUMBER() OVER (ORDER BY created_at) AS rn FROM public.tickets
+    )
+    UPDATE public.tickets SET ticket_number = numbered.rn FROM numbered WHERE public.tickets.id = numbered.id;
+  END IF;
+END $$;
+
+-- Admin delete policy for tickets
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Admins can delete tickets') THEN
+    CREATE POLICY "Admins can delete tickets" ON public.tickets FOR DELETE USING (
+      EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND (is_admin = TRUE OR role = 'owner'))
+    );
+  END IF;
+END $$;
+
+-- Admin delete policy for ticket_messages
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Admins can delete ticket messages') THEN
+    CREATE POLICY "Admins can delete ticket messages" ON public.ticket_messages FOR DELETE USING (
+      EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND (is_admin = TRUE OR role = 'owner'))
+    );
+  END IF;
+END $$;
+
+-- Admin insert policy for ticket_messages (so admins can reply)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Admins can create ticket messages') THEN
+    CREATE POLICY "Admins can create ticket messages" ON public.ticket_messages FOR INSERT WITH CHECK (
+      EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND (is_admin = TRUE OR role = 'owner'))
+    );
+  END IF;
+END $$;
+
+-- Reload schema cache
+NOTIFY pgrst, 'reload schema';
