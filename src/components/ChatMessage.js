@@ -9,7 +9,7 @@ import NextImage from 'next/image';
 import { useState } from 'react';
 import { format } from 'date-fns';
 
-export default function ChatMessage({ message, agentName, agentImage }) {
+export default function ChatMessage({ message, agentName, agentImage, userAvatar }) {
   const [copied, setCopied] = useState(false);
   const isUser = message.role === 'user';
   const isImage = message.message_type === 'image_generation';
@@ -28,17 +28,21 @@ export default function ChatMessage({ message, agentName, agentImage }) {
       className={`flex gap-2.5 ${isUser ? 'flex-row-reverse' : ''} group mb-3`}
     >
       {/* Avatar */}
-      <div className={`flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center ${
-        isUser
-          ? 'bg-indigo-500'
-          : 'bg-indigo-500/10'
-      }`}>
-        {isUser ? (
-          <User className="w-3.5 h-3.5 text-white" />
-        ) : (
-          <NextImage src="/toxiqailogo.png" alt="AI" width={18} height={18} className="rounded-sm" />
-        )}
-      </div>
+      {isUser && userAvatar ? (
+        <img src={userAvatar} alt="" className="flex-shrink-0 w-7 h-7 rounded-md object-cover" />
+      ) : (
+        <div className={`flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center ${
+          isUser
+            ? 'bg-indigo-500'
+            : 'bg-indigo-500/10'
+        }`}>
+          {isUser ? (
+            <User className="w-3.5 h-3.5 text-white" />
+          ) : (
+            <NextImage src="/toxiqailogo.png" alt="AI" width={18} height={18} className="rounded-sm" />
+          )}
+        </div>
+      )}
 
       {/* Message content */}
       <div className={`flex flex-col max-w-[80%] ${isUser ? 'items-end' : 'items-start'}`}>

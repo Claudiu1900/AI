@@ -74,7 +74,7 @@ DO $$ BEGIN
       auth.uid() = user_id
       AND (
         EXISTS (SELECT 1 FROM public.tickets WHERE id = ticket_id AND user_id = auth.uid())
-        OR EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND (is_admin = TRUE OR role = 'owner'))
+        OR EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND (is_admin = TRUE OR role IN ('admin', 'owner')))
       )
     );
   END IF;

@@ -77,7 +77,6 @@ export default function VoiceRecorder({ onTranscription, disabled }) {
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = true;
-    recognition.lang = '';  // Empty string = auto-detect language
     recognition.maxAlternatives = 1;
 
     let finalTranscript = '';

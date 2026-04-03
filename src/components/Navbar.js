@@ -90,9 +90,13 @@ export default function Navbar() {
                   onClick={() => setProfileOpen(!profileOpen)}
                   className="flex items-center space-x-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.04] transition-colors"
                 >
-                  <div className="w-7 h-7 rounded-full bg-indigo-500/80 flex items-center justify-center text-xs font-semibold">
-                    {profile?.display_name?.[0]?.toUpperCase() || 'U'}
-                  </div>
+                  {profile?.avatar_url ? (
+                    <img src={profile.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-7 h-7 rounded-full bg-indigo-500/80 flex items-center justify-center text-xs font-semibold">
+                      {profile?.display_name?.[0]?.toUpperCase() || 'U'}
+                    </div>
+                  )}
                   <span className="text-[13px] text-zinc-300 max-w-[120px] truncate">{profile?.display_name || 'User'}</span>
                   <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${profileOpen ? 'rotate-180' : ''}`} />
                 </button>

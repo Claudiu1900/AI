@@ -663,6 +663,7 @@ export default function ChatPage() {
                 message={msg}
                 agentName={selectedAgent?.name}
                 agentImage={selectedAgent?.image_url}
+                userAvatar={profile?.avatar_url}
               />
             ))
           )}

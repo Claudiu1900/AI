@@ -967,9 +967,13 @@ function UsersTab({ supabase, currentUser, currentProfile }) {
                       selectedUser?.id === u.id ? 'bg-indigo-500/5' : ''
                     }`}
                   >
-                    <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-[13px] font-bold text-indigo-300 flex-shrink-0">
-                      {u.display_name?.[0]?.toUpperCase() || '?'}
-                    </div>
+                    {u.avatar_url ? (
+                      <img src={u.avatar_url} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-[13px] font-bold text-indigo-300 flex-shrink-0">
+                        {u.display_name?.[0]?.toUpperCase() || '?'}
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-1.5">
                         <p className="font-medium text-[13px]">{u.display_name}</p>
