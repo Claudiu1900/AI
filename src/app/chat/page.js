@@ -23,7 +23,7 @@ export default function ChatPage() {
   const [agents, setAgents] = useState([]);
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [showAgentPicker, setShowAgentPicker] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(typeof window !== 'undefined' ? window.innerWidth >= 768 : true);
   const [searchQuery, setSearchQuery] = useState('');
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
@@ -361,6 +361,19 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">
+      {/* Mobile sidebar backdrop */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSidebarOpen(false)}
+            className="fixed inset-0 bg-black/50 z-30 md:hidden"
+          />
+        )}
+      </AnimatePresence>
+
       {/* Sidebar */}
       <AnimatePresence>
         {sidebarOpen && (
@@ -369,7 +382,7 @@ export default function ChatPage() {
             animate={{ width: 300, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="flex-shrink-0 bg-[#09090b]/95 backdrop-blur-lg border-r border-white/[0.04] flex flex-col overflow-hidden"
+            className="fixed md:relative inset-y-0 left-0 top-14 z-40 md:z-auto flex-shrink-0 bg-[#09090b]/98 md:bg-[#09090b]/95 backdrop-blur-lg border-r border-white/[0.04] flex flex-col overflow-hidden"
           >
             <div className="p-3 border-b border-white/[0.04]">
               <div className="flex items-center justify-between mb-2.5">
@@ -391,7 +404,7 @@ export default function ChatPage() {
               </button>
 
               <div className="relative mt-2.5">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 z-10 pointer-events-none" />
                 <input
                   type="text"
                   value={searchQuery}
@@ -420,6 +433,7 @@ export default function ChatPage() {
                       setCurrentConv(conv);
                       const agent = agents.find(a => a.id === conv.ai_agent_id);
                       if (agent) setSelectedAgent(agent);
+                      if (window.innerWidth < 768) setSidebarOpen(false);
                     }}
                     className={`w-full text-left sidebar-item flex items-center space-x-2.5 group ${
                       currentConv?.id === conv.id ? 'active' : ''

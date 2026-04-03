@@ -143,7 +143,7 @@ export default function SettingsPage() {
         <p className="text-[13px] text-zinc-400 mb-5">Manage your account and preferences</p>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-3 mb-5">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-5">
           {[
             { label: 'Conversations', value: stats.conversations, icon: MessageSquare, color: 'bg-indigo-500/10 text-indigo-400' },
             { label: 'Messages', value: stats.messages, icon: Zap, color: 'bg-violet-500/10 text-violet-400' },
@@ -165,16 +165,16 @@ export default function SettingsPage() {
           })}
         </div>
 
-        <div className="flex gap-4">
-          {/* Tabs */}
-          <div className="w-40 flex-shrink-0 space-y-0.5">
+        <div className="flex flex-col sm:flex-row gap-4">
+          {/* Tabs - horizontal on mobile, vertical on desktop */}
+          <div className="sm:w-40 flex-shrink-0 flex sm:flex-col space-x-1 sm:space-x-0 sm:space-y-0.5 overflow-x-auto pb-2 sm:pb-0">
             {settingsTabs.map(tab => {
               const Icon = tab.icon;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors ${
+                  className={`w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors whitespace-nowrap ${
                     activeTab === tab.id
                       ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/15'
                       : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
@@ -186,7 +186,7 @@ export default function SettingsPage() {
               );
             })}
 
-            <div className="pt-3 border-t border-white/[0.04] mt-3">
+            <div className="sm:pt-3 sm:border-t border-white/[0.04] sm:mt-3">
               <button
                 onClick={signOut}
                 className="w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-[13px] font-medium text-red-400 hover:bg-red-500/10 transition-colors"
@@ -212,7 +212,7 @@ export default function SettingsPage() {
                   <div>
                     <label className="block text-[13px] font-medium text-zinc-300 mb-1.5">Display Name</label>
                     <div className="relative">
-                      <User className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                      <User className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 z-10 pointer-events-none" />
                       <input
                         type="text"
                         value={displayName}
@@ -225,7 +225,7 @@ export default function SettingsPage() {
                   <div>
                     <label className="block text-[13px] font-medium text-zinc-300 mb-1.5">Username</label>
                     <div className="relative">
-                      <AtSign className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                      <AtSign className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 z-10 pointer-events-none" />
                       <input
                         type="text"
                         value={username}
@@ -248,7 +248,7 @@ export default function SettingsPage() {
                   <div>
                     <label className="block text-[13px] font-medium text-zinc-300 mb-1.5">Email</label>
                     <div className="relative">
-                      <Mail className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                      <Mail className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 z-10 pointer-events-none" />
                       <input
                         type="email"
                         value={user?.email || ''}
@@ -287,7 +287,7 @@ export default function SettingsPage() {
                   <div>
                     <label className="block text-[13px] font-medium text-zinc-300 mb-1.5">New Password</label>
                     <div className="relative">
-                      <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                      <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 z-10 pointer-events-none" />
                       <input
                         type={showPassword ? 'text' : 'password'}
                         value={newPassword}
@@ -308,7 +308,7 @@ export default function SettingsPage() {
                   <div>
                     <label className="block text-[13px] font-medium text-zinc-300 mb-1.5">Confirm New Password</label>
                     <div className="relative">
-                      <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                      <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 z-10 pointer-events-none" />
                       <input
                         type={showPassword ? 'text' : 'password'}
                         value={confirmPassword}

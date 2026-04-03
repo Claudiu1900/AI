@@ -120,7 +120,7 @@ export default function RegisterPage() {
             <div>
               <label className="block text-[13px] font-medium text-zinc-300 mb-1.5">Display Name</label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 z-10 pointer-events-none" />
                 <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="John Doe" required className="input-dark pl-10" />
               </div>
             </div>
@@ -128,7 +128,7 @@ export default function RegisterPage() {
             <div>
               <label className="block text-[13px] font-medium text-zinc-300 mb-1.5">Username</label>
               <div className="relative">
-                <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 z-10 pointer-events-none" />
                 <input type="text" value={username} onChange={(e) => setUsername(e.target.value.toLowerCase())} placeholder="johndoe" required className="input-dark pl-10" />
               </div>
             </div>
@@ -136,7 +136,7 @@ export default function RegisterPage() {
             <div>
               <label className="block text-[13px] font-medium text-zinc-300 mb-1.5">Email</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 z-10 pointer-events-none" />
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@email.com" required className="input-dark pl-10" />
               </div>
             </div>
@@ -144,7 +144,7 @@ export default function RegisterPage() {
             <div>
               <label className="block text-[13px] font-medium text-zinc-300 mb-1.5">Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 z-10 pointer-events-none" />
                 <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required minLength={6} className="input-dark pl-10 pr-10" />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors">
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -155,7 +155,7 @@ export default function RegisterPage() {
             <div>
               <label className="block text-[13px] font-medium text-zinc-300 mb-1.5">Confirm Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 z-10 pointer-events-none" />
                 <input type={showPassword ? 'text' : 'password'} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" required className="input-dark pl-10" />
               </div>
             </div>

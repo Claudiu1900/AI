@@ -45,29 +45,29 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">
-      {/* Admin sidebar */}
-      <aside className="w-56 flex-shrink-0 bg-[#09090b]/95 backdrop-blur-lg border-r border-white/[0.04] p-3 flex flex-col">
-        <div className="flex items-center space-x-2 mb-4 px-1">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-3.5rem)] overflow-hidden">
+      {/* Admin sidebar - horizontal on mobile, vertical on desktop */}
+      <aside className="md:w-56 flex-shrink-0 bg-[#09090b]/95 backdrop-blur-lg border-b md:border-b-0 md:border-r border-white/[0.04] p-2 md:p-3 flex md:flex-col overflow-x-auto md:overflow-x-hidden">
+        <div className="hidden md:flex items-center space-x-2 mb-4 px-1">
           <Shield className="w-4 h-4 text-indigo-400" />
           <h2 className="text-sm font-semibold text-zinc-200">Admin Panel</h2>
         </div>
 
-        <nav className="space-y-0.5 flex-1">
+        <nav className="flex md:flex-col md:space-y-0.5 space-x-1 md:space-x-0 flex-1">
           {tabs.map(tab => {
             const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors ${
+                className={`flex items-center space-x-2 md:space-x-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/15'
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
-                <span>{tab.label}</span>
+                <span className="hidden md:inline">{tab.label}</span>
               </button>
             );
           })}
@@ -75,7 +75,7 @@ export default function AdminPage() {
       </aside>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-5">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-5">
         <AnimatePresence mode="wait">
           {activeTab === 'dashboard' && <DashboardTab key="dashboard" supabase={supabase} />}
           {activeTab === 'users' && <UsersTab key="users" supabase={supabase} currentUser={user} />}
@@ -313,7 +313,7 @@ function UsersTab({ supabase, currentUser }) {
 
       {/* Search */}
       <div className="relative mb-4">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 z-10 pointer-events-none" />
         <input
           type="text"
           value={searchQuery}
@@ -323,7 +323,7 @@ function UsersTab({ supabase, currentUser }) {
         />
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex flex-col lg:flex-row gap-4">
         {/* Users list */}
         <div className="flex-1">
           <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl overflow-hidden">
