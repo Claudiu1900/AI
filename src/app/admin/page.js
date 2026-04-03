@@ -1,0 +1,961 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useAuth } from '@/components/AuthProvider';
+import { useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
+import toast from 'react-hot-toast';
+import {
+  Shield, Users, Bot, BarChart3, Settings, Search,
+  Plus, Trash2, Edit3, Save, X, Check, ChevronDown,
+  MessageSquare, Zap, Clock, Eye, EyeOff, Key,
+  UserCheck, UserX, Image, Mic, Sparkles, Activity,
+  Database, Globe, Lock, Unlock, RefreshCw, Download,
+  TrendingUp, Hash
+} from 'lucide-react';
+
+const tabs = [
+  { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+  { id: 'users', label: 'Users', icon: Users },
+  { id: 'agents', label: 'AI Agents', icon: Bot },
+  { id: 'statistics', label: 'Statistics', icon: TrendingUp },
+  { id: 'settings', label: 'Settings', icon: Settings },
+];
+
+export default function AdminPage() {
+  const { user, profile, supabase } = useAuth();
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!profile?.is_admin) {
+      router.push('/chat');
+      return;
+    }
+    setLoading(false);
+  }, [profile]);
+
+  if (loading || !profile?.is_admin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">
+      {/* Admin sidebar */}
+      <aside className="w-56 flex-shrink-0 bg-[#09090b]/95 backdrop-blur-lg border-r border-white/[0.04] p-3 flex flex-col">
+        <div className="flex items-center space-x-2 mb-4 px-1">
+          <Shield className="w-4 h-4 text-indigo-400" />
+          <h2 className="text-sm font-semibold text-zinc-200">Admin Panel</h2>
+        </div>
+
+        <nav className="space-y-0.5 flex-1">
+          {tabs.map(tab => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors ${
+                  activeTab === tab.id
+                    ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/15'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      </aside>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-5">
+        <AnimatePresence mode="wait">
+          {activeTab === 'dashboard' && <DashboardTab key="dashboard" supabase={supabase} />}
+          {activeTab === 'users' && <UsersTab key="users" supabase={supabase} currentUser={user} />}
+          {activeTab === 'agents' && <AgentsTab key="agents" supabase={supabase} />}
+          {activeTab === 'statistics' && <StatisticsTab key="statistics" supabase={supabase} />}
+          {activeTab === 'settings' && <SettingsTab key="settings" supabase={supabase} />}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// DASHBOARD TAB
+// ============================================
+function DashboardTab({ supabase }) {
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    totalConversations: 0,
+    totalMessages: 0,
+    totalAgents: 0,
+    activeUsers: 0,
+    todayMessages: 0,
+  });
+  const [recentActivity, setRecentActivity] = useState([]);
+
+  useEffect(() => {
+    fetchStats();
+    fetchActivity();
+  }, []);
+
+  const fetchStats = async () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const [users, convs, msgs, agents, todayMsgs] = await Promise.all([
+      supabase.from('profiles').select('id', { count: 'exact', head: true }),
+      supabase.from('conversations').select('id', { count: 'exact', head: true }),
+      supabase.from('messages').select('id', { count: 'exact', head: true }),
+      supabase.from('ai_agents').select('id', { count: 'exact', head: true }),
+      supabase.from('messages').select('id', { count: 'exact', head: true }).gte('created_at', today.toISOString()),
+    ]);
+
+    setStats({
+      totalUsers: users.count || 0,
+      totalConversations: convs.count || 0,
+      totalMessages: msgs.count || 0,
+      totalAgents: agents.count || 0,
+      todayMessages: todayMsgs.count || 0,
+    });
+  };
+
+  const fetchActivity = async () => {
+    const { data } = await supabase
+      .from('activity_log')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(10);
+    setRecentActivity(data || []);
+  };
+
+  const statCards = [
+    { label: 'Total Users', value: stats.totalUsers, icon: Users, color: 'bg-indigo-500/10 text-indigo-400' },
+    { label: 'Conversations', value: stats.totalConversations, icon: MessageSquare, color: 'bg-violet-500/10 text-violet-400' },
+    { label: 'Total Messages', value: stats.totalMessages, icon: Zap, color: 'bg-emerald-500/10 text-emerald-400' },
+    { label: 'AI Agents', value: stats.totalAgents, icon: Bot, color: 'bg-amber-500/10 text-amber-400' },
+    { label: 'Today\'s Messages', value: stats.todayMessages, icon: Clock, color: 'bg-cyan-500/10 text-cyan-400' },
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.2 }}
+    >
+      <h1 className="text-lg font-semibold mb-4">Dashboard</h1>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 mb-6">
+        {statCards.map(card => {
+          const Icon = card.icon;
+          return (
+            <div
+              key={card.label}
+              className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-4"
+            >
+              <div className={`w-8 h-8 rounded-lg ${card.color} flex items-center justify-center mb-2.5`}>
+                <Icon className="w-4 h-4" />
+              </div>
+              <p className="text-xl font-bold">{card.value.toLocaleString()}</p>
+              <p className="text-[11px] text-zinc-500 mt-0.5">{card.label}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Recent Activity */}
+      <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-5">
+        <h3 className="text-sm font-semibold mb-3 flex items-center space-x-1.5">
+          <Activity className="w-4 h-4 text-indigo-400" />
+          <span>Recent Activity</span>
+        </h3>
+        {recentActivity.length === 0 ? (
+          <p className="text-zinc-500 text-[13px]">No recent activity</p>
+        ) : (
+          <div className="space-y-1.5">
+            {recentActivity.map(log => (
+              <div key={log.id} className="flex items-center space-x-2.5 p-2.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.04] transition-colors">
+                <div className="w-7 h-7 rounded-md bg-indigo-500/10 flex items-center justify-center">
+                  <Zap className="w-3.5 h-3.5 text-indigo-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px]">{log.action}</p>
+                  <p className="text-[11px] text-zinc-500">{new Date(log.created_at).toLocaleString()}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+// ============================================
+// USERS TAB
+// ============================================
+function UsersTab({ supabase, currentUser }) {
+  const [users, setUsers] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [agents, setAgents] = useState([]);
+  const [userAccess, setUserAccess] = useState([]);
+
+  useEffect(() => {
+    fetchUsers();
+    fetchAgents();
+  }, []);
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false });
+    setUsers(data || []);
+    setLoading(false);
+  };
+
+  const fetchAgents = async () => {
+    const { data } = await supabase.from('ai_agents').select('*').eq('is_active', true);
+    setAgents(data || []);
+  };
+
+  const fetchUserAccess = async (userId) => {
+    const { data } = await supabase
+      .from('user_ai_access')
+      .select('*, ai_agents(name)')
+      .eq('user_id', userId);
+    setUserAccess(data || []);
+  };
+
+  const toggleAdmin = async (userId, isAdmin) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ is_admin: !isAdmin })
+      .eq('user_id', userId);
+
+    if (!error) {
+      setUsers(prev => prev.map(u => u.user_id === userId ? { ...u, is_admin: !isAdmin } : u));
+      toast.success(`Admin ${!isAdmin ? 'granted' : 'revoked'}`);
+    }
+  };
+
+  const grantAccess = async (userId, agentId, prompts = 100) => {
+    const { error } = await supabase
+      .from('user_ai_access')
+      .upsert({
+        user_id: userId,
+        ai_agent_id: agentId,
+        allowed_prompts: prompts,
+        is_active: true,
+        granted_by: currentUser.id,
+      }, { onConflict: 'user_id,ai_agent_id' });
+
+    if (!error) {
+      toast.success('Access granted');
+      fetchUserAccess(userId);
+    }
+  };
+
+  const revokeAccess = async (accessId) => {
+    const { error } = await supabase
+      .from('user_ai_access')
+      .delete()
+      .eq('id', accessId);
+
+    if (!error) {
+      toast.success('Access revoked');
+      setUserAccess(prev => prev.filter(a => a.id !== accessId));
+    }
+  };
+
+  const updatePromptLimit = async (accessId, newLimit) => {
+    const { error } = await supabase
+      .from('user_ai_access')
+      .update({ allowed_prompts: parseInt(newLimit) })
+      .eq('id', accessId);
+
+    if (!error) {
+      toast.success('Prompt limit updated');
+      setUserAccess(prev => prev.map(a => a.id === accessId ? { ...a, allowed_prompts: parseInt(newLimit) } : a));
+    }
+  };
+
+  const filteredUsers = users.filter(u =>
+    u.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    u.display_name?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.2 }}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-lg font-semibold">User Management</h1>
+        <button onClick={fetchUsers} className="p-1.5 rounded-lg hover:bg-white/[0.04] transition-colors">
+          <RefreshCw className="w-4 h-4 text-zinc-400" />
+        </button>
+      </div>
+
+      {/* Search */}
+      <div className="relative mb-4">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search by username, display name, or email..."
+          className="input-dark pl-8 text-[13px]"
+        />
+      </div>
+
+      <div className="flex gap-4">
+        {/* Users list */}
+        <div className="flex-1">
+          <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl overflow-hidden">
+            <div className="p-3 border-b border-white/[0.04]">
+              <p className="text-[13px] text-zinc-400">{filteredUsers.length} users found</p>
+            </div>
+            <div className="divide-y divide-white/[0.04] max-h-[60vh] overflow-y-auto">
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="p-3 shimmer h-14" />
+                ))
+              ) : (
+                filteredUsers.map(u => (
+                  <button
+                    key={u.id}
+                    onClick={() => { setSelectedUser(u); fetchUserAccess(u.user_id); }}
+                    className={`w-full flex items-center space-x-3 p-3 hover:bg-white/[0.03] transition-colors text-left ${
+                      selectedUser?.id === u.id ? 'bg-indigo-500/5' : ''
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-[13px] font-bold text-indigo-300 flex-shrink-0">
+                      {u.display_name?.[0]?.toUpperCase() || '?'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-1.5">
+                        <p className="font-medium text-[13px]">{u.display_name}</p>
+                        {u.is_admin && (
+                          <span className="px-1 py-0.5 rounded bg-indigo-500/10 text-indigo-400 text-[9px] font-bold">
+                            ADMIN
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-zinc-500">@{u.username}</p>
+                    </div>
+                    <p className="text-[10px] text-zinc-600">{new Date(u.created_at).toLocaleDateString()}</p>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* User details panel */}
+        <AnimatePresence>
+          {selectedUser && (
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.2 }}
+              className="w-80 bg-white/[0.03] border border-white/[0.05] rounded-xl p-5 self-start"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold">User Details</h3>
+                <button onClick={() => setSelectedUser(null)} className="p-1 rounded-md hover:bg-white/[0.04]">
+                  <X className="w-3.5 h-3.5 text-zinc-400" />
+                </button>
+              </div>
+
+              <div className="text-center mb-4">
+                <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center text-lg font-bold text-indigo-300 mx-auto mb-2">
+                  {selectedUser.display_name?.[0]?.toUpperCase()}
+                </div>
+                <p className="font-semibold text-sm">{selectedUser.display_name}</p>
+                <p className="text-[13px] text-zinc-500">@{selectedUser.username}</p>
+              </div>
+
+              {/* Admin toggle */}
+              <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] mb-3">
+                <div className="flex items-center space-x-1.5">
+                  <Shield className="w-3.5 h-3.5 text-indigo-400" />
+                  <span className="text-[13px]">Admin Access</span>
+                </div>
+                <button
+                  onClick={() => toggleAdmin(selectedUser.user_id, selectedUser.is_admin)}
+                  className={`w-10 h-5 rounded-full transition-colors ${
+                    selectedUser.is_admin ? 'bg-indigo-500' : 'bg-zinc-700'
+                  } relative`}
+                >
+                  <div className={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all ${
+                    selectedUser.is_admin ? 'left-[22px]' : 'left-0.5'
+                  }`} />
+                </button>
+              </div>
+
+              {/* AI Access Management */}
+              <div className="mb-3">
+                <h4 className="text-[13px] font-semibold mb-2 flex items-center space-x-1.5">
+                  <Bot className="w-3.5 h-3.5 text-violet-400" />
+                  <span>AI Access</span>
+                </h4>
+
+                {/* Current access */}
+                <div className="space-y-1.5 mb-2">
+                  {userAccess.map(access => (
+                    <div key={access.id} className="flex items-center justify-between p-2 rounded-lg bg-white/[0.03]">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-medium">{access.ai_agents?.name}</p>
+                        <div className="flex items-center space-x-1.5 mt-0.5">
+                          <input
+                            type="number"
+                            defaultValue={access.allowed_prompts}
+                            onBlur={(e) => updatePromptLimit(access.id, e.target.value)}
+                            className="w-16 px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/[0.06] text-[11px] text-center"
+                            min="0"
+                          />
+                          <span className="text-[10px] text-zinc-500">prompts ({access.used_prompts} used)</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => revokeAccess(access.id)}
+                        className="p-1 rounded-md hover:bg-red-500/10 text-red-400"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Grant new access */}
+                <div className="space-y-1">
+                  {agents
+                    .filter(a => !userAccess.find(ua => ua.ai_agent_id === a.id))
+                    .map(agent => (
+                      <button
+                        key={agent.id}
+                        onClick={() => grantAccess(selectedUser.user_id, agent.id)}
+                        className="w-full flex items-center space-x-1.5 p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/10 hover:border-emerald-500/20 transition-colors text-[13px]"
+                      >
+                        <Plus className="w-3 h-3 text-emerald-400" />
+                        <span className="text-emerald-300">{agent.name}</span>
+                      </button>
+                    ))
+                  }
+                </div>
+              </div>
+
+              <div className="text-[10px] text-zinc-600 mt-3">
+                <p>Joined: {new Date(selectedUser.created_at).toLocaleString()}</p>
+                <p>User ID: {selectedUser.user_id}</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </motion.div>
+  );
+}
+
+// ============================================
+// AGENTS TAB
+// ============================================
+function AgentsTab({ supabase }) {
+  const [agents, setAgents] = useState([]);
+  const [editing, setEditing] = useState(null);
+  const [showNew, setShowNew] = useState(false);
+  const [form, setForm] = useState({
+    name: '', description: '', api_type: 'openai', model: '',
+    api_key_env: 'OPENAI_API_KEY', system_prompt: 'You are a helpful AI assistant.',
+    max_tokens: 4096, temperature: 0.7, supports_images: false,
+    supports_voice: false, supports_image_generation: false, image_url: '',
+  });
+
+  useEffect(() => {
+    fetchAgents();
+  }, []);
+
+  const fetchAgents = async () => {
+    const { data } = await supabase.from('ai_agents').select('*').order('created_at');
+    setAgents(data || []);
+  };
+
+  const saveAgent = async () => {
+    if (!form.name || !form.model) {
+      toast.error('Name and model are required');
+      return;
+    }
+
+    if (editing) {
+      const { error } = await supabase.from('ai_agents').update(form).eq('id', editing);
+      if (!error) { toast.success('Agent updated'); setEditing(null); }
+    } else {
+      const { error } = await supabase.from('ai_agents').insert(form);
+      if (!error) { toast.success('Agent created'); setShowNew(false); }
+    }
+
+    setForm({
+      name: '', description: '', api_type: 'openai', model: '',
+      api_key_env: 'OPENAI_API_KEY', system_prompt: 'You are a helpful AI assistant.',
+      max_tokens: 4096, temperature: 0.7, supports_images: false,
+      supports_voice: false, supports_image_generation: false, image_url: '',
+    });
+    fetchAgents();
+  };
+
+  const deleteAgent = async (id) => {
+    const { error } = await supabase.from('ai_agents').delete().eq('id', id);
+    if (!error) {
+      toast.success('Agent deleted');
+      fetchAgents();
+    }
+  };
+
+  const startEdit = (agent) => {
+    setEditing(agent.id);
+    setForm({
+      name: agent.name,
+      description: agent.description,
+      api_type: agent.api_type,
+      model: agent.model,
+      api_key_env: agent.api_key_env,
+      system_prompt: agent.system_prompt,
+      max_tokens: agent.max_tokens,
+      temperature: agent.temperature,
+      supports_images: agent.supports_images,
+      supports_voice: agent.supports_voice,
+      supports_image_generation: agent.supports_image_generation,
+      image_url: agent.image_url,
+    });
+    setShowNew(true);
+  };
+
+  const toggleActive = async (id, isActive) => {
+    await supabase.from('ai_agents').update({ is_active: !isActive }).eq('id', id);
+    fetchAgents();
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.2 }}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-lg font-semibold">AI Agents</h1>
+        <button
+          onClick={() => { setShowNew(!showNew); setEditing(null); setForm({
+            name: '', description: '', api_type: 'openai', model: '',
+            api_key_env: 'OPENAI_API_KEY', system_prompt: 'You are a helpful AI assistant.',
+            max_tokens: 4096, temperature: 0.7, supports_images: false,
+            supports_voice: false, supports_image_generation: false, image_url: '',
+          }); }}
+          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[13px] font-medium hover:border-indigo-500/30 transition-colors"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>New Agent</span>
+        </button>
+      </div>
+
+      {/* Agent Form */}
+      <AnimatePresence>
+        {showNew && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-5 mb-4 overflow-hidden"
+          >
+            <h3 className="text-sm font-semibold mb-3">{editing ? 'Edit Agent' : 'New Agent'}</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Name</label>
+                <input value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="input-dark text-sm" placeholder="ChatGPT-4o" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Model ID</label>
+                <input value={form.model} onChange={e => setForm({...form, model: e.target.value})} className="input-dark text-sm" placeholder="gpt-4o" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">API Type</label>
+                <select value={form.api_type} onChange={e => setForm({...form, api_type: e.target.value})} className="input-dark text-sm">
+                  <option value="openai">OpenAI</option>
+                  <option value="gemini">Google Gemini</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">API Key Env Variable</label>
+                <input value={form.api_key_env} onChange={e => setForm({...form, api_key_env: e.target.value})} className="input-dark text-sm" placeholder="OPENAI_API_KEY" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Max Tokens</label>
+                <input type="number" value={form.max_tokens} onChange={e => setForm({...form, max_tokens: parseInt(e.target.value)})} className="input-dark text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Temperature</label>
+                <input type="number" step="0.1" min="0" max="2" value={form.temperature} onChange={e => setForm({...form, temperature: parseFloat(e.target.value)})} className="input-dark text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Image URL</label>
+                <input value={form.image_url} onChange={e => setForm({...form, image_url: e.target.value})} className="input-dark text-sm" placeholder="/agents/chatgpt.svg" />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs text-gray-400 mb-1">Description</label>
+                <input value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="input-dark text-sm" placeholder="Description..." />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs text-gray-400 mb-1">System Prompt</label>
+                <textarea value={form.system_prompt} onChange={e => setForm({...form, system_prompt: e.target.value})} className="input-dark text-sm min-h-[80px] resize-y" />
+              </div>
+              <div className="md:col-span-2 flex flex-wrap gap-4">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input type="checkbox" checked={form.supports_images} onChange={e => setForm({...form, supports_images: e.target.checked})} className="rounded" />
+                  <span className="text-sm">Supports Images</span>
+                </label>
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input type="checkbox" checked={form.supports_voice} onChange={e => setForm({...form, supports_voice: e.target.checked})} className="rounded" />
+                  <span className="text-sm">Supports Voice</span>
+                </label>
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input type="checkbox" checked={form.supports_image_generation} onChange={e => setForm({...form, supports_image_generation: e.target.checked})} className="rounded" />
+                  <span className="text-sm">Image Generation</span>
+                </label>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2 mt-4">
+              <button onClick={saveAgent} className="text-[13px] font-medium bg-indigo-500 hover:bg-indigo-400 text-white px-4 py-2 rounded-lg transition-colors">
+                {editing ? 'Update' : 'Create'} Agent
+              </button>
+              <button onClick={() => { setShowNew(false); setEditing(null); }} className="text-[13px] font-medium px-4 py-2 rounded-lg border border-white/[0.06] hover:bg-white/[0.04] transition-colors">
+                Cancel
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Agents grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        {agents.map(agent => (
+          <div
+            key={agent.id}
+            className={`bg-white/[0.03] border border-white/[0.05] rounded-xl p-4 ${!agent.is_active ? 'opacity-50' : ''}`}
+          >
+            <div className="flex items-start justify-between mb-2.5">
+              <div className="w-9 h-9 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-indigo-400" />
+              </div>
+              <div className="flex items-center space-x-0.5">
+                <button onClick={() => toggleActive(agent.id, agent.is_active)} className="p-1 rounded-md hover:bg-white/[0.04]">
+                  {agent.is_active ? <Eye className="w-3.5 h-3.5 text-emerald-400" /> : <EyeOff className="w-3.5 h-3.5 text-zinc-500" />}
+                </button>
+                <button onClick={() => startEdit(agent)} className="p-1 rounded-md hover:bg-white/[0.04]">
+                  <Edit3 className="w-3.5 h-3.5 text-zinc-400" />
+                </button>
+                <button onClick={() => deleteAgent(agent.id)} className="p-1 rounded-md hover:bg-red-500/10">
+                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                </button>
+              </div>
+            </div>
+            <h3 className="text-[13px] font-semibold mb-0.5">{agent.name}</h3>
+            <p className="text-[11px] text-zinc-500 mb-2 line-clamp-2">{agent.description}</p>
+            <div className="flex flex-wrap gap-1 mt-2">
+              <span className="px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 text-[10px]">{agent.api_type}</span>
+              <span className="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 text-[10px]">{agent.model}</span>
+              {agent.supports_images && <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px]">Images</span>}
+              {agent.supports_voice && <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 text-[10px]">Voice</span>}
+              {agent.supports_image_generation && <span className="px-1.5 py-0.5 rounded bg-pink-500/10 text-pink-400 text-[10px]">Gen Images</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+// ============================================
+// STATISTICS TAB
+// ============================================
+function StatisticsTab({ supabase }) {
+  const [stats, setStats] = useState({
+    messagesByDay: [],
+    topUsers: [],
+    topAgents: [],
+    totalTokens: 0,
+    avgMessagesPerConv: 0,
+  });
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const fetchStats = async () => {
+    // Top users by message count
+    const { data: convData } = await supabase
+      .from('conversations')
+      .select('user_id, message_count, profiles!conversations_user_id_fkey(display_name, username)');
+
+    const userMessages = {};
+    convData?.forEach(c => {
+      const uid = c.user_id;
+      if (!userMessages[uid]) {
+        userMessages[uid] = {
+          name: c.profiles?.display_name || 'Unknown',
+          username: c.profiles?.username || '',
+          total: 0,
+          convs: 0,
+        };
+      }
+      userMessages[uid].total += c.message_count || 0;
+      userMessages[uid].convs += 1;
+    });
+
+    const topUsers = Object.values(userMessages)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10);
+
+    // Top agents by usage
+    const { data: accessData } = await supabase
+      .from('user_ai_access')
+      .select('used_prompts, ai_agents(name)');
+
+    const agentUsage = {};
+    accessData?.forEach(a => {
+      const name = a.ai_agents?.name || 'Unknown';
+      agentUsage[name] = (agentUsage[name] || 0) + (a.used_prompts || 0);
+    });
+
+    const topAgents = Object.entries(agentUsage)
+      .map(([name, usage]) => ({ name, usage }))
+      .sort((a, b) => b.usage - a.usage);
+
+    // Total conversation stats
+    const totalMsgs = topUsers.reduce((acc, u) => acc + u.total, 0);
+    const totalConvs = topUsers.reduce((acc, u) => acc + u.convs, 0);
+
+    setStats({
+      topUsers,
+      topAgents,
+      avgMessagesPerConv: totalConvs > 0 ? Math.round(totalMsgs / totalConvs) : 0,
+    });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.2 }}
+    >
+      <h1 className="text-lg font-semibold mb-4">Statistics</h1>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Top Users */}
+        <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-5">
+          <h3 className="text-sm font-semibold mb-3 flex items-center space-x-1.5">
+            <Users className="w-4 h-4 text-indigo-400" />
+            <span>Top Users by Messages</span>
+          </h3>
+          <div className="space-y-2">
+            {stats.topUsers.map((user, i) => (
+              <div key={i} className="flex items-center space-x-2.5">
+                <span className="text-[11px] text-zinc-500 w-5">#{i + 1}</span>
+                <div className="w-7 h-7 rounded-md bg-indigo-500/10 flex items-center justify-center text-[11px] font-bold text-indigo-300">
+                  {user.name[0]?.toUpperCase()}
+                </div>
+                <div className="flex-1">
+                  <p className="text-[13px] font-medium">{user.name}</p>
+                  <p className="text-[10px] text-zinc-500">@{user.username} · {user.convs} chats</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[13px] font-semibold text-indigo-400">{user.total.toLocaleString()}</p>
+                  <p className="text-[10px] text-zinc-500">messages</p>
+                </div>
+              </div>
+            ))}
+            {stats.topUsers.length === 0 && (
+              <p className="text-[13px] text-zinc-500">No data yet</p>
+            )}
+          </div>
+        </div>
+
+        {/* Top Agents */}
+        <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-5">
+          <h3 className="text-sm font-semibold mb-3 flex items-center space-x-1.5">
+            <Bot className="w-4 h-4 text-violet-400" />
+            <span>AI Agent Usage</span>
+          </h3>
+          <div className="space-y-2.5">
+            {stats.topAgents.map((agent, i) => (
+              <div key={i} className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-violet-400" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-[13px] font-medium">{agent.name}</p>
+                  <div className="w-full bg-white/[0.04] rounded-full h-1 mt-1">
+                    <div
+                      className="bg-indigo-500 h-1 rounded-full"
+                      style={{ width: `${Math.min(100, (agent.usage / (stats.topAgents[0]?.usage || 1)) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+                <span className="text-[13px] font-semibold text-violet-400">{agent.usage.toLocaleString()}</span>
+              </div>
+            ))}
+            {stats.topAgents.length === 0 && (
+              <p className="text-[13px] text-zinc-500">No data yet</p>
+            )}
+          </div>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-5 lg:col-span-2">
+          <h3 className="text-sm font-semibold mb-3 flex items-center space-x-1.5">
+            <Hash className="w-4 h-4 text-emerald-400" />
+            <span>Quick Stats</span>
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3 rounded-lg bg-white/[0.03]">
+              <p className="text-xl font-bold text-indigo-400">{stats.avgMessagesPerConv}</p>
+              <p className="text-[11px] text-zinc-500 mt-0.5">Avg msgs/chat</p>
+            </div>
+            <div className="p-3 rounded-lg bg-white/[0.03]">
+              <p className="text-xl font-bold text-indigo-400">{stats.topUsers.length}</p>
+              <p className="text-[11px] text-zinc-500 mt-0.5">Active users</p>
+            </div>
+            <div className="p-3 rounded-lg bg-white/[0.03]">
+              <p className="text-xl font-bold text-indigo-400">{stats.topAgents.length}</p>
+              <p className="text-[11px] text-zinc-500 mt-0.5">Agents in use</p>
+            </div>
+            <div className="p-3 rounded-lg bg-white/[0.03]">
+              <p className="text-xl font-bold text-indigo-400">
+                {stats.topAgents.reduce((acc, a) => acc + a.usage, 0).toLocaleString()}
+              </p>
+              <p className="text-[11px] text-zinc-500 mt-0.5">Total prompts used</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ============================================
+// SETTINGS TAB
+// ============================================
+function SettingsTab({ supabase }) {
+  const [settings, setSettings] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  const fetchSettings = async () => {
+    setLoading(true);
+    const { data } = await supabase.from('admin_settings').select('*').order('key');
+    setSettings(data || []);
+    setLoading(false);
+  };
+
+  const updateSetting = async (id, key, value) => {
+    const { error } = await supabase
+      .from('admin_settings')
+      .update({ value: JSON.stringify(value), updated_at: new Date().toISOString() })
+      .eq('id', id);
+
+    if (!error) {
+      toast.success(`${key} updated`);
+      fetchSettings();
+    }
+  };
+
+  const getSettingValue = (setting) => {
+    try {
+      return JSON.parse(setting.value);
+    } catch {
+      return setting.value;
+    }
+  };
+
+  const isBoolean = (val) => val === 'true' || val === 'false' || val === true || val === false;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.2 }}
+    >
+      <h1 className="text-lg font-semibold mb-4">Admin Settings</h1>
+
+      <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl overflow-hidden">
+        {loading ? (
+          <div className="p-6 text-center">
+            <div className="w-6 h-6 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mx-auto" />
+          </div>
+        ) : (
+          <div className="divide-y divide-white/[0.04]">
+            {settings.map(setting => {
+              const value = getSettingValue(setting);
+              const isBool = isBoolean(value);
+
+              return (
+                <div key={setting.id} className="flex items-center justify-between p-3.5 hover:bg-white/[0.02] transition-colors">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-1.5">
+                      <Settings className="w-3.5 h-3.5 text-indigo-400" />
+                      <p className="font-medium text-[13px]">{setting.key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
+                    </div>
+                    <p className="text-[11px] text-zinc-500 mt-0.5 ml-5">{setting.description}</p>
+                  </div>
+                  <div>
+                    {isBool ? (
+                      <button
+                        onClick={() => updateSetting(setting.id, setting.key, value === 'true' || value === true ? 'false' : 'true')}
+                        className={`w-10 h-5 rounded-full transition-colors ${
+                          (value === 'true' || value === true) ? 'bg-indigo-500' : 'bg-zinc-700'
+                        } relative`}
+                      >
+                        <div className={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all ${
+                          (value === 'true' || value === true) ? 'left-[22px]' : 'left-0.5'
+                        }`} />
+                      </button>
+                    ) : (
+                      <input
+                        type={typeof value === 'number' ? 'number' : 'text'}
+                        defaultValue={value}
+                        onBlur={(e) => updateSetting(setting.id, setting.key, e.target.value)}
+                        className="input-dark text-[13px] w-36 text-right py-1"
+                      />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
