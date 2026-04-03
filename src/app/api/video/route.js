@@ -1,6 +1,8 @@
+import { GoogleGenAI } from '@google/genai';
 import { NextResponse } from 'next/server';
 
-const VEO_API_BASE = 'https://veo3api.com';
+// Allow long-running video generation (Vercel Pro: up to 300s)
+export const maxDuration = 300;
 
 // Enhance the user prompt for cinematic video generation
 async function enhanceVideoPrompt(userPrompt) {
@@ -45,7 +47,7 @@ Example output: A thrilling high-speed car race through a neon-lit cityscape at 
 export async function POST(req) {
   try {
     const { prompt, model, api_key_env } = await req.json();
-    const envVar = api_key_env || 'VEO3_API_KEY';
+    const envVar = api_key_env || 'GOOGLE_GEMINI_API_KEY';
     const apiKey = process.env[envVar];
 
     if (!prompt) {
@@ -60,90 +62,50 @@ export async function POST(req) {
     const enhancedPrompt = await enhanceVideoPrompt(prompt);
     console.log('Video enhanced prompt:', enhancedPrompt);
 
-    const veoModel = model || 'veo-3.1';
+    // Init Google GenAI SDK
+    const ai = new GoogleGenAI({ apiKey });
 
-    // Step 1: Start video generation
-    const generateRes = await fetch(`${VEO_API_BASE}/generate`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+    // Start video generation
+    let operation = await ai.models.generateVideos({
+      model: model || 'veo-3.1-generate-preview',
+      prompt: enhancedPrompt,
+      config: {
+        numberOfVideos: 1,
+        aspectRatio: '16:9',
+        personGeneration: 'allow_all',
       },
-      body: JSON.stringify({
-        prompt: enhancedPrompt,
-        model: veoModel,
-        aspect_ratio: '16:9',
-        watermark: null,
-      }),
     });
 
-    if (!generateRes.ok) {
-      const errText = await generateRes.text();
-      console.error('Veo generate error:', generateRes.status, errText);
-      return NextResponse.json({ error: `Video generation failed: ${generateRes.status}` }, { status: 500 });
-    }
-
-    const generateData = await generateRes.json();
-
-    if (generateData.code !== 200 || !generateData.data?.task_id) {
-      return NextResponse.json({ error: generateData.message || 'No task ID returned' }, { status: 500 });
-    }
-
-    const taskId = generateData.data.task_id;
-    console.log('Video task started:', taskId);
-
-    // Step 2: Poll for completion (max ~5 minutes)
-    let videoUrl = null;
-    const maxAttempts = 60; // 60 * 5s = 5 minutes
+    // Poll for completion (max ~5 minutes)
+    const maxAttempts = 30; // 30 * 10s = 5 minutes
     for (let i = 0; i < maxAttempts; i++) {
-      await new Promise(r => setTimeout(r, 5000));
-
-      const pollRes = await fetch(`${VEO_API_BASE}/feed?task_id=${taskId}`, {
-        headers: { 'Authorization': `Bearer ${apiKey}` },
-      });
-
-      if (!pollRes.ok) {
-        console.error('Poll error:', pollRes.status);
-        continue;
-      }
-
-      const pollData = await pollRes.json();
-
-      if (pollData.data?.status === 'COMPLETED') {
-        const urls = pollData.data?.response;
-        if (urls && urls.length > 0) {
-          videoUrl = urls[0];
-        }
-        break;
-      }
-
-      if (pollData.data?.status === 'FAILED') {
-        return NextResponse.json({ error: 'Video generation failed' }, { status: 500 });
-      }
-
-      console.log(`Video polling... attempt ${i + 1}/${maxAttempts}, status: ${pollData.data?.status}`);
+      if (operation.done) break;
+      await new Promise(r => setTimeout(r, 10000));
+      operation = await ai.operations.get({ operation });
+      console.log(`Video polling... attempt ${i + 1}/${maxAttempts}`);
     }
 
-    if (!videoUrl) {
+    if (!operation.done) {
       return NextResponse.json({ error: 'Video generation timed out' }, { status: 504 });
     }
 
-    // Step 3: Try to get 1080p version (free)
-    try {
-      const hdRes = await fetch(`${VEO_API_BASE}/get-1080p?task_id=${taskId}`, {
-        headers: { 'Authorization': `Bearer ${apiKey}` },
-      });
-      if (hdRes.ok) {
-        const hdData = await hdRes.json();
-        if (hdData.data?.result_url) {
-          videoUrl = hdData.data.result_url;
-        }
-      }
-    } catch {
-      // 1080p upgrade failed, use original URL
+    const videos = operation.response?.generatedVideos;
+    if (!videos || videos.length === 0) {
+      return NextResponse.json({ error: 'No video generated' }, { status: 500 });
     }
 
-    return NextResponse.json({ url: videoUrl });
+    // Extract video file reference
+    const generatedVideo = videos[0];
+    const fileName = generatedVideo.video?.name || generatedVideo.video?.uri;
+
+    if (!fileName) {
+      return NextResponse.json({ error: 'Could not get video file reference' }, { status: 500 });
+    }
+
+    // Return proxy URL (streams video through our server to avoid exposing API key)
+    const fileId = fileName.startsWith('files/') ? fileName : `files/${fileName}`;
+    const proxyUrl = `/api/video/stream?name=${encodeURIComponent(fileId)}`;
+    return NextResponse.json({ url: proxyUrl });
 
   } catch (error) {
     console.error('Video generation error:', error);
