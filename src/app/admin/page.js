@@ -23,24 +23,38 @@ const tabs = [
 ];
 
 export default function AdminPage() {
-  const { user, profile, supabase, loading: authLoading } = useAuth();
+  const { user, profile, supabase, loading: authLoading, profileLoading } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!profile?.is_admin && profile?.role !== 'owner') {
+    if (authLoading || profileLoading) return;
+    if (!user) return;
+    if (!profile) {
+      // Profile failed to load — don't redirect, just stop loading
+      setLoading(false);
+      return;
+    }
+    if (!profile.is_admin && profile.role !== 'owner') {
       router.push('/chat');
       return;
     }
     setLoading(false);
-  }, [profile, authLoading]);
+  }, [profile, authLoading, profileLoading, user]);
 
-  if (loading || (!profile?.is_admin && profile?.role !== 'owner')) {
+  if (authLoading || profileLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="w-6 h-6 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!profile?.is_admin && profile?.role !== 'owner') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-zinc-400 text-sm">You don't have access to the admin panel.</p>
       </div>
     );
   }

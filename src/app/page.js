@@ -20,28 +20,32 @@ const stagger = {
 };
 
 export default function HomePage() {
-  const { user, profile, supabase } = useAuth();
+  const { user, profile, supabase, loading: authLoading } = useAuth();
   const [stats, setStats] = useState({ users: 0, chats: 0, messages: 0 });
+  const [statsLoaded, setStatsLoaded] = useState(false);
 
   useEffect(() => {
+    if (!supabase || authLoading) return;
     const fetchStats = async () => {
       try {
-        const [profilesRes, convsRes, msgsRes] = await Promise.all([
+        const results = await Promise.allSettled([
           supabase.from('profiles').select('id', { count: 'exact', head: true }),
           supabase.from('conversations').select('id', { count: 'exact', head: true }),
           supabase.from('messages').select('id', { count: 'exact', head: true }),
         ]);
         setStats({
-          users: profilesRes.count || 0,
-          chats: convsRes.count || 0,
-          messages: msgsRes.count || 0,
+          users: results[0].status === 'fulfilled' ? (results[0].value.count || 0) : 0,
+          chats: results[1].status === 'fulfilled' ? (results[1].value.count || 0) : 0,
+          messages: results[2].status === 'fulfilled' ? (results[2].value.count || 0) : 0,
         });
       } catch (err) {
         console.error('Failed to fetch stats:', err);
+      } finally {
+        setStatsLoaded(true);
       }
     };
-    if (supabase) fetchStats();
-  }, [supabase]);
+    fetchStats();
+  }, [supabase, authLoading]);
 
   const features = [
     {

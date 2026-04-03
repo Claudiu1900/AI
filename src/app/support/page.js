@@ -25,7 +25,7 @@ const statusConfig = {
 };
 
 export default function SupportPage() {
-  const { user, profile, supabase } = useAuth();
+  const { user, profile, supabase, loading: authLoading } = useAuth();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
@@ -34,23 +34,34 @@ export default function SupportPage() {
   const [submitting, setSubmitting] = useState(false);
   const [replyMessage, setReplyMessage] = useState('');
   const [ticketMessages, setTicketMessages] = useState([]);
+  const [dbError, setDbError] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return;
     if (user) fetchTickets();
     else setLoading(false);
-  }, [user]);
+  }, [user, authLoading]);
 
   const fetchTickets = async () => {
     setLoading(true);
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('tickets')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
-      setTickets(data || []);
+      if (error) {
+        console.error('Tickets fetch error:', error);
+        if (error.code === '42P01' || error.message?.includes('does not exist')) {
+          setDbError(true);
+        }
+        setTickets([]);
+      } else {
+        setTickets(data || []);
+      }
     } catch (err) {
       console.error('Failed to fetch tickets:', err);
+      setTickets([]);
     }
     setLoading(false);
   };
@@ -85,7 +96,16 @@ export default function SupportPage() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === '42P01' || error.message?.includes('does not exist')) {
+          toast.error('Ticket system is being set up. Please try again later.');
+          setDbError(true);
+        } else {
+          toast.error('Failed to create ticket: ' + error.message);
+        }
+        setSubmitting(false);
+        return;
+      }
 
       // Also save the initial message
       await supabase.from('ticket_messages').insert({
