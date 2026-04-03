@@ -335,6 +335,29 @@ export default function ChatPage() {
           .single();
 
         if (aiMsg) setMessages(prev => [...prev, aiMsg]);
+      } else if (agent.supports_video_generation) {
+        const res = await fetch('/api/video', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: messageContent, model: agent.model }),
+        });
+        const data = await res.json();
+
+        if (data.error) throw new Error(data.error);
+
+        const { data: aiMsg } = await supabase
+          .from('messages')
+          .insert({
+            conversation_id: conv.id,
+            role: 'assistant',
+            content: messageContent,
+            message_type: 'video_generation',
+            metadata: { video_url: data.url },
+          })
+          .select()
+          .single();
+
+        if (aiMsg) setMessages(prev => [...prev, aiMsg]);
       } else {
         // Regular chat
         const chatHistory = messages.slice(-20).map(m => ({

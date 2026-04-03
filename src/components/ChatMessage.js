@@ -4,20 +4,41 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import CodeBlock from './CodeBlock';
 import { motion } from 'framer-motion';
-import { Bot, User, Copy, Check, Image as ImageIcon } from 'lucide-react';
+import { Bot, User, Copy, Check, Image as ImageIcon, Download, Video, Play } from 'lucide-react';
 import NextImage from 'next/image';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { format } from 'date-fns';
 
 export default function ChatMessage({ message, agentName, agentImage, userAvatar }) {
   const [copied, setCopied] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [videoPlaying, setVideoPlaying] = useState(false);
+  const videoRef = useRef(null);
   const isUser = message.role === 'user';
   const isImage = message.message_type === 'image_generation';
+  const isVideo = message.message_type === 'video_generation';
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message.content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownload = async (url, filename) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch {
+      window.open(url, '_blank');
+    }
   };
 
   return (
@@ -61,19 +82,84 @@ export default function ChatMessage({ message, agentName, agentImage, userAvatar
             : 'bg-white/[0.03] border border-white/[0.05]'
         }`}>
           {isImage ? (
-            <div className="space-y-1.5">
-              <div className="flex items-center space-x-1.5 text-[13px] text-indigo-400 mb-1.5">
-                <ImageIcon className="w-3.5 h-3.5" />
-                <span>Generated Image</span>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-1.5 text-[13px] text-indigo-400">
+                  <ImageIcon className="w-3.5 h-3.5" />
+                  <span className="font-medium">Generated Image</span>
+                </div>
+                {message.metadata?.image_url && (
+                  <button
+                    onClick={() => handleDownload(message.metadata.image_url, `image-${Date.now()}.png`)}
+                    className="flex items-center space-x-1 px-2 py-1 rounded-md bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-[11px] text-zinc-300 transition-colors"
+                    title="Download image"
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>Download</span>
+                  </button>
+                )}
               </div>
               {message.metadata?.image_url && (
-                <img
-                  src={message.metadata.image_url}
-                  alt="Generated"
-                  className="rounded-lg max-w-md w-full"
-                />
+                <div className="relative group/img rounded-xl overflow-hidden border border-white/[0.08] bg-black/20">
+                  <img
+                    src={message.metadata.image_url}
+                    alt="Generated"
+                    className={`w-full max-w-lg rounded-xl transition-opacity duration-500 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+                    onLoad={() => setImageLoaded(true)}
+                  />
+                  {!imageLoaded && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  )}
+                </div>
               )}
-              <p className="text-[13px] text-zinc-400 mt-1.5">{message.content}</p>
+              <p className="text-[12px] text-zinc-500 italic">{message.content}</p>
+            </div>
+          ) : isVideo ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-1.5 text-[13px] text-purple-400">
+                  <Video className="w-3.5 h-3.5" />
+                  <span className="font-medium">Generated Video</span>
+                </div>
+                {message.metadata?.video_url && (
+                  <button
+                    onClick={() => handleDownload(message.metadata.video_url, `video-${Date.now()}.mp4`)}
+                    className="flex items-center space-x-1 px-2 py-1 rounded-md bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-[11px] text-zinc-300 transition-colors"
+                    title="Download video"
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>Download</span>
+                  </button>
+                )}
+              </div>
+              {message.metadata?.video_url && (
+                <div className="relative rounded-xl overflow-hidden border border-white/[0.08] bg-black/30 max-w-lg">
+                  <video
+                    ref={videoRef}
+                    src={message.metadata.video_url}
+                    className="w-full rounded-xl"
+                    controls
+                    playsInline
+                    preload="metadata"
+                    onPlay={() => setVideoPlaying(true)}
+                    onPause={() => setVideoPlaying(false)}
+                    onEnded={() => setVideoPlaying(false)}
+                  />
+                  {!videoPlaying && (
+                    <div
+                      className="absolute inset-0 flex items-center justify-center cursor-pointer bg-black/20 hover:bg-black/10 transition-colors"
+                      onClick={() => videoRef.current?.play()}
+                    >
+                      <div className="w-14 h-14 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center border border-white/20">
+                        <Play className="w-6 h-6 text-white ml-1" fill="white" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              <p className="text-[12px] text-zinc-500 italic">{message.content}</p>
             </div>
           ) : message.message_type === 'image' && message.metadata?.image_url ? (
             <div className="space-y-1.5">

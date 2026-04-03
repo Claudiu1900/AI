@@ -1222,7 +1222,7 @@ function AgentsTab({ supabase }) {
     name: '', description: '', api_type: 'openai', model: '',
     api_key_env: 'OPENAI_API_KEY', system_prompt: 'You are a helpful AI assistant.',
     max_tokens: 4096, temperature: 0.7, supports_images: false,
-    supports_voice: false, supports_image_generation: false, image_url: '', is_default: false,
+    supports_voice: false, supports_image_generation: false, supports_video_generation: false, image_url: '', is_default: false,
   });
 
   useEffect(() => {
@@ -1256,7 +1256,7 @@ function AgentsTab({ supabase }) {
         name: '', description: '', api_type: 'openai', model: '',
         api_key_env: 'OPENAI_API_KEY', system_prompt: 'You are a helpful AI assistant.',
         max_tokens: 4096, temperature: 0.7, supports_images: false,
-        supports_voice: false, supports_image_generation: false, image_url: '', is_default: false,
+        supports_voice: false, supports_image_generation: false, supports_video_generation: false, image_url: '', is_default: false,
       });
     }
     fetchAgents();
@@ -1284,6 +1284,7 @@ function AgentsTab({ supabase }) {
       supports_images: agent.supports_images,
       supports_voice: agent.supports_voice,
       supports_image_generation: agent.supports_image_generation,
+      supports_video_generation: agent.supports_video_generation || false,
       image_url: agent.image_url,
       is_default: agent.is_default || false,
     });
@@ -1333,7 +1334,7 @@ function AgentsTab({ supabase }) {
             name: '', description: '', api_type: 'openai', model: '',
             api_key_env: 'OPENAI_API_KEY', system_prompt: 'You are a helpful AI assistant.',
             max_tokens: 4096, temperature: 0.7, supports_images: false,
-            supports_voice: false, supports_image_generation: false, image_url: '', is_default: false,
+            supports_voice: false, supports_image_generation: false, supports_video_generation: false, image_url: '', is_default: false,
           }); }}
           className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[13px] font-medium hover:border-indigo-500/30 transition-colors"
         >
@@ -1369,6 +1370,7 @@ function AgentsTab({ supabase }) {
                   <option value="openrouter">OpenRouter</option>
                   <option value="gemini">Google Gemini</option>
                   <option value="huggingface">HuggingFace</option>
+                  <option value="google">Google (Veo)</option>
                   <option value="custom">Custom</option>
                 </select>
               </div>
@@ -1408,6 +1410,10 @@ function AgentsTab({ supabase }) {
                 <label className="flex items-center space-x-2 cursor-pointer">
                   <input type="checkbox" checked={form.supports_image_generation} onChange={e => setForm({...form, supports_image_generation: e.target.checked})} className="rounded" />
                   <span className="text-sm">Image Generation</span>
+                </label>
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input type="checkbox" checked={form.supports_video_generation} onChange={e => setForm({...form, supports_video_generation: e.target.checked})} className="rounded" />
+                  <span className="text-sm">Video Generation</span>
                 </label>
               </div>
             </div>
