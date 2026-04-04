@@ -78,6 +78,7 @@ export default function VoiceRecorder({ onTranscription, disabled }) {
     recognition.continuous = false;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
+    recognition.lang = 'ro-RO';
 
     let finalTranscript = '';
     let hasResult = false;

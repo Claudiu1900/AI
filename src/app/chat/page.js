@@ -8,7 +8,7 @@ import VoiceRecorder from '@/components/VoiceRecorder';
 import Image from 'next/image';
 import toast from 'react-hot-toast';
 import {
-  Plus, Send, Image as ImageIcon, Trash2,
+  Plus, Send, Square, Image as ImageIcon, Trash2,
   MessageSquare, Search, ChevronDown, Bot, Loader2,
   PanelLeftClose, PanelLeftOpen, Sparkles, X,
   Download, Share2, Copy, Check
@@ -33,6 +33,7 @@ export default function ChatPage() {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
   // Fetch user's accessible agents
   useEffect(() => {
@@ -266,6 +267,9 @@ export default function ChatPage() {
     setInput('');
     setSending(true);
 
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     let imageUrl = null;
     if (imageFile) {
       // Upload image to a data URL for the API
@@ -317,6 +321,7 @@ export default function ChatPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ prompt: messageContent, model: agent.model, api_type: agent.api_type }),
+          signal: abortController.signal,
         });
         const data = await res.json();
 
@@ -340,6 +345,7 @@ export default function ChatPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ prompt: messageContent, model: agent.model, api_key_env: agent.api_key_env }),
+          signal: abortController.signal,
         });
         const data = await res.json();
 
@@ -383,6 +389,7 @@ export default function ChatPage() {
             max_tokens: agent.max_tokens,
             temperature: agent.temperature,
           }),
+          signal: abortController.signal,
         });
 
         const data = await res.json();
@@ -422,11 +429,22 @@ export default function ChatPage() {
       });
 
     } catch (err) {
-      toast.error(err.message || 'Failed to get AI response');
+      if (err.name === 'AbortError') {
+        toast('Generation cancelled', { icon: '⏹️' });
+      } else {
+        toast.error(err.message || 'Failed to get AI response');
+      }
     }
 
+    abortControllerRef.current = null;
     setSending(false);
     inputRef.current?.focus();
+  };
+
+  const cancelGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
   };
 
   const filteredConversations = conversations.filter(c =>
@@ -798,17 +816,24 @@ export default function ChatPage() {
             </div>
 
             {/* Send button */}
-            <button
-              type="submit"
-              disabled={(!input.trim() && !imageFile) || sending || agents.length === 0}
-              className="p-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            >
-              {sending ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
+            {sending ? (
+              <button
+                type="button"
+                onClick={cancelGeneration}
+                className="p-2 rounded-lg bg-red-500/80 hover:bg-red-500 text-white transition-colors"
+                title="Cancel generation"
+              >
+                <Square className="w-4 h-4" />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={(!input.trim() && !imageFile) || agents.length === 0}
+                className="p-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
                 <Send className="w-4 h-4" />
-              )}
-            </button>
+              </button>
+            )}
           </form>
         </div>
       </div>

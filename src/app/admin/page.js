@@ -1262,12 +1262,15 @@ function AgentsTab({ supabase }) {
     fetchAgents();
   };
 
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+
   const deleteAgent = async (id) => {
     const { error } = await supabase.from('ai_agents').delete().eq('id', id);
     if (!error) {
       toast.success('Agent deleted');
       fetchAgents();
     }
+    setDeleteConfirm(null);
   };
 
   const startEdit = (agent) => {
@@ -1440,7 +1443,7 @@ function AgentsTab({ supabase }) {
               <div className="w-9 h-9 rounded-lg bg-indigo-500/10 flex items-center justify-center">
                 <Sparkles className="w-4 h-4 text-indigo-400" />
               </div>
-              <div className="flex items-center space-x-0.5">
+              <div className="flex items-center space-x-0.5 relative">
                 <button onClick={() => toggleActive(agent.id, agent.is_active)} className="p-1 rounded-md hover:bg-white/[0.04]">
                   {agent.is_active ? <Eye className="w-3.5 h-3.5 text-emerald-400" /> : <EyeOff className="w-3.5 h-3.5 text-zinc-500" />}
                 </button>
@@ -1450,9 +1453,18 @@ function AgentsTab({ supabase }) {
                 <button onClick={() => duplicateAgent(agent)} className="p-1 rounded-md hover:bg-indigo-500/10" title="Duplicate agent">
                   <Copy className="w-3.5 h-3.5 text-indigo-400" />
                 </button>
-                <button onClick={() => deleteAgent(agent.id)} className="p-1 rounded-md hover:bg-red-500/10">
+                <button onClick={() => setDeleteConfirm(agent.id)} className="p-1 rounded-md hover:bg-red-500/10">
                   <Trash2 className="w-3.5 h-3.5 text-red-400" />
                 </button>
+                {deleteConfirm === agent.id && (
+                  <div className="absolute right-0 top-full mt-1 z-50 bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow-2xl min-w-[220px]">
+                    <p className="text-sm text-zinc-300 mb-3">Are you sure?</p>
+                    <div className="flex gap-2">
+                      <button onClick={() => setDeleteConfirm(null)} className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-700 hover:bg-zinc-600 text-zinc-300 transition-colors">No</button>
+                      <button onClick={() => deleteAgent(agent.id)} className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 transition-colors">I am sure</button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             <h3 className="text-[13px] font-semibold mb-0.5">
